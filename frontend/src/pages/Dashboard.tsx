@@ -98,7 +98,87 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
-      {/*__D2__*/}
+      {/* Low stock warning */}
+      <div className="mt-6">
+        <h2 className="mb-2 text-lg font-semibold">Low Stock Alerts</h2>
+        <div className="card overflow-hidden">
+          {lowStock.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-green-600">
+              All stock levels OK
+            </div>
+          ) : (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="th-sort">Product</th>
+                  <th className="th-sort">Warehouse</th>
+                  <th className="th-sort">Qty</th>
+                  <th className="th-sort">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {lowStock.map((r, i) => (
+                  <tr key={i}>
+                    <td className="px-4 py-3 text-sm font-medium">{r.Product_Name}</td>
+                    <td className="px-4 py-3 text-sm">{r.Warehouse_Name || "—"}</td>
+                    <td className="px-4 py-3 text-sm">{r.Quantity}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <Badge tone={r.Stock_Status === "OUT OF STOCK" ? "red" : "yellow"}>
+                        {r.Stock_Status}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+      {/* Recent orders */}
+      <div className="mt-6">
+        <h2 className="mb-2 text-lg font-semibold">Recent Orders</h2>
+        <div className="card overflow-hidden">
+          {orders.length === 0 ? (
+            <div className="px-4 py-8 text-center text-sm text-gray-400">No orders yet</div>
+          ) : (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="th-sort">Order</th>
+                  <th className="th-sort">Customer</th>
+                  <th className="th-sort">Total</th>
+                  <th className="th-sort">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {orders.map((o) => (
+                  <tr key={o.Order_ID}>
+                    <td className="px-4 py-3 text-sm font-semibold">#{o.Order_ID}</td>
+                    <td className="px-4 py-3 text-sm">{o.Customer_Name || o.Customer_ID}</td>
+                    <td className="px-4 py-3 text-sm font-semibold">{inr(o.Total_Amount)}</td>
+                    <td className="px-4 py-3 text-sm">
+                      <Badge
+                        tone={
+                          o.Status === "delivered"
+                            ? "green"
+                            : o.Status === "cancelled"
+                            ? "red"
+                            : "yellow"
+                        }
+                      >
+                        {o.Status}
+                      </Badge>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+      {/*__D3__*/}
+
+
     </div>
   );
 }
