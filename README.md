@@ -1,8 +1,60 @@
 # Food Supply Management System
 
-A complete professional web application for managing food supply operations, built with Flask and MySQL.
+A complete professional web application for managing food supply operations.
 
-## Features
+## Full-stack architecture (React + Express + MySQL)
+
+The project has been migrated to a modern full-stack split while **reusing the
+existing MySQL schema** (`database/02_init.sql`) and its business rules (views,
+stored procedures) as the source of truth:
+
+```
+.
+├── backend/                  # Express + TypeScript + MySQL2 REST API
+├── frontend/                 # React + Vite + Tailwind CSS + React Router
+├── database/
+│   ├── 01_docker_create_user.sql
+│   └── 02_init.sql           # source-of-truth schema (unchanged)
+├── docker-compose.yml        # MySQL + API for local dev
+└── app.py                    # original Flask app (kept as reference)
+```
+
+- **Backend**: Express + TypeScript, `mysql2` pool, JWT in httpOnly cookies,
+  bcrypt password hashing, role-based middleware (`admin` / `manager` / `viewer`),
+  centralized error handling. Default `admin` / `admin123`.
+- **Frontend**: React + Vite + Tailwind, protected routes, sidebar navigation,
+  generic CRUD screens, dashboard KPIs, and reports.
+- **Database**: unchanged. Runs `02_init.sql` on first boot via Docker Compose.
+
+### Run the full stack
+
+```bash
+# 1) Start MySQL (or point .env files at an existing instance)
+docker compose up -d db
+
+# 2) Backend
+cd backend && cp .env.example .env && npm install && npm run dev     # :5001
+
+# 3) Frontend (separate terminal)
+cd frontend && npm install && npm run dev                            # :5173
+```
+
+Then open http://localhost:5173 and sign in with `admin` / `admin123`.
+
+See `backend/README.md` and `frontend/README.md` for detailed setup and the
+complete API reference.
+
+---
+
+## Original Flask application
+
+The original Flask + MySQL build is preserved in `app.py` and can still be run as-is:
+
+- **Backend**: Flask (Python)
+- **Database**: MySQL
+- **Frontend**: HTML5, Tailwind CSS, JavaScript (server-rendered templates)
+
+### Features
 
 - **User Authentication**: Secure login system with password hashing
 - **Dashboard**: Real-time metrics and statistics
