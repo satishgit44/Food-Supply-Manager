@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign Up — Food Supply Manager</title>
+  
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}">
+  
+  <style>
+    body {
+      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+      padding: 20px;
+    }
+    
+    .login-container {
+      width: 100%;
+      max-width: 400px;
+      background: rgba(30, 41, 59, 0.7);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-xl);
+      box-shadow: var(--shadow-lg), 0 0 80px rgba(16, 185, 129, 0.08);
+      padding: 40px 32px;
+      animation: scaleIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+    
+    .login-logo {
+      width: 56px;
+      height: 56px;
+      background: linear-gradient(135deg, var(--emerald-500), var(--emerald-700));
+      border-radius: var(--radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
+      box-shadow: 0 8px 24px rgba(16, 185, 129, 0.3);
+    }
+    
+    .login-logo i {
+      color: white;
+      font-size: 26px;
+    }
+    
+    .login-header h1 {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      color: white;
+      font-size: 24px;
+      font-weight: 800;
+      text-align: center;
+      margin: 0 0 8px;
+    }
+    
+    .login-header p {
+      color: var(--sidebar-text);
+      font-size: 14px;
+      text-align: center;
+      margin: 0 0 32px;
+    }
+    
+    .login-field {
+      position: relative;
+      margin-bottom: 20px;
+    }
+    
+    .login-field i {
+      position: absolute;
+      left: 14px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: #64748b;
+      font-size: 16px;
+      transition: color var(--transition);
+    }
+    
+    .login-input {
+      width: 100%;
+      background: rgba(15, 23, 42, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: var(--radius-sm);
+      padding: 12px 16px 12px 42px;
+      color: white;
+      font-size: 14px;
+      outline: none;
+      transition: all var(--transition);
+    }
+    
+    .login-input:focus {
+      border-color: var(--emerald-500);
+      background: rgba(15, 23, 42, 0.8);
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+    }
+    
+    .login-input:focus + i {
+      color: var(--emerald-400);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Toast Container -->
+  <div id="toast-container" class="fixed top-5 right-5 z-[999] flex flex-col gap-3 pointer-events-none" style="position:fixed;top:20px;right:20px;z-index:999;display:flex;flex-direction:column;gap:10px;pointer-events:none;"></div>
+
+  <div class="login-container">
+    {% if registration_disabled %}
+      <div style="text-align:center; padding: 20px 0">
+        <i class="fas fa-lock" style="font-size: 48px; color: #ef4444; margin-bottom: 20px"></i>
+        <h2 style="color: white; font-size: 20px; margin-bottom: 10px">Registration Disabled</h2>
+        <p style="color: var(--sidebar-text); font-size: 14px; line-height: 1.5">New user registration is currently disabled by the administrator.</p>
+        <a href="/login" class="btn btn-ghost" style="margin-top: 24px; width: 100%; justify-content: center">Back to Login</a>
+      </div>
+    {% else %}
+      <div class="login-logo">
+        <i class="fas fa-user-plus"></i>
+      </div>
+      
+      <div class="login-header">
+        <h1>Create Account</h1>
+        <p>Register to manage supply chain data</p>
+      </div>
+      
+      <form id="registerForm">
+        <div class="login-field">
+          <input type="text" id="username" class="login-input" placeholder="Username" required autocomplete="username">
+          <i class="fas fa-user"></i>
+        </div>
+        
+        <div class="login-field">
+          <input type="password" id="password" class="login-input" placeholder="Password" required autocomplete="new-password">
+          <i class="fas fa-lock"></i>
+        </div>
+
+        <div class="login-field" style="margin-bottom:28px">
+          <input type="password" id="confirmPassword" class="login-input" placeholder="Confirm Password" required autocomplete="new-password">
+          <i class="fas fa-lock"></i>
+        </div>
+        
+        <button type="submit" class="btn btn-primary" style="width:100%; justify-content:center; padding:12px; font-size:14px">
+          Create Account <i class="fas fa-check" style="margin-left:4px"></i>
+        </button>
+      </form>
+      
+      <p style="text-align:center; color:var(--sidebar-text); font-size:13px; margin:24px 0 0">
+        Already have an account? <a href="/login" style="color:var(--emerald-400); font-weight:600; text-decoration:none">Sign In here</a>
+      </p>
+    {% endif %}
+  </div>
+
+  <script>
+    function showToast(message, type = 'success', duration = 3000) {
+      const container = document.getElementById('toast-container');
+      const toast = document.createElement('div');
+      toast.className = `toast toast-${type}`;
+      toast.style.pointerEvents = 'auto';
+      toast.innerHTML = `<span style="flex:1">${message}</span>`;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), duration);
+    }
+
+    const regForm = document.getElementById('registerForm');
+    if (regForm) {
+      regForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value.trim();
+        const confirmPassword = document.getElementById('confirmPassword').value.trim();
+
+        if (password !== confirmPassword) {
+          showToast('Passwords do not match', 'error');
+          return;
+        }
+
+        try {
+          const res = await fetch('/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ username, password })
+          });
+          const result = await res.json();
+
+          if (result.success) {
+            showToast('Account created successfully! Redirecting to login...', 'success');
+            setTimeout(() => window.location.href = '/login', 1500);
+          } else {
+            showToast(result.message || 'Registration failed', 'error');
+          }
+        } catch {
+          showToast('An unexpected error occurred.', 'error');
+        }
+      });
+    }
+  </script>
+</body>
+</html>

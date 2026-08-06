@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Warehouses — Food Supply Manager{% endblock %}
+
+{% block body %}
+<div class="app-shell">
+  {% set active_page = 'warehouses' %}
+  {% include 'partials/sidebar.html' %}
+
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-title"><h1>Warehouses</h1><p>Manage storage locations</p></div>
+      <div class="topbar-actions">
+        {% if can_write %}<button class="btn btn-primary" onclick="openAddModal()"><i class="fas fa-plus"></i> Add Warehouse</button>{% endif %}
+        <div style="position:relative">
+          <div class="user-chip" onclick="toggleUserDropdown(event)"><div class="user-chip-avatar">{{ current_user.username[0].upper() }}</div><span class="user-chip-name">{{ current_user.username }}</span></div>
+          <div id="user-dropdown" class="user-dropdown hidden">
+            <div class="dropdown-divider"></div>
+            <a class="dropdown-item danger" href="/logout"><i class="fas fa-sign-out-alt" style="width:16px"></i> Sign Out</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="content-scroll page-content">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-body" style="padding:14px 20px;display:flex;gap:12px;align-items:center">
+          <div class="search-bar" style="flex:1"><i class="fas fa-search"></i><input type="text" id="search-input" class="search-input" placeholder="Search warehouses…" oninput="filterTable()"></div>
+          <select id="status-filter" class="form-select" style="width:160px;padding:9px 12px" onchange="filterTable()">
+            <option value="">All Statuses</option><option value="operational">Operational</option><option value="maintenance">Maintenance</option><option value="closed">Closed</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="loadData()"><i class="fas fa-rotate-right"></i></button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2 class="card-title"><i class="fas fa-warehouse" style="color:var(--emerald-500);margin-right:8px"></i>Warehouse List</h2><span id="count" style="font-size:12px;color:var(--text-muted);font-weight:600"></span></div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>ID</th><th>Name</th><th>City</th><th>Capacity (Tons)</th><th>Manager</th><th>Status</th>{% if can_write %}<th>Actions</th>{% endif %}</tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="item-modal" class="modal-backdrop hidden" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header"><h3 class="modal-title" id="modal-title">Add Warehouse</h3><button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-id">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Warehouse ID *</label><input type="number" id="f-id" class="form-input"></div>
+        <div class="form-group"><label class="form-label">Warehouse Name *</label><input type="text" id="f-name" class="form-input"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">City</label><input type="text" id="f-city" class="form-input"></div>
+        <div class="form-group"><label class="form-label">Capacity (Tons)</label><input type="number" step="0.01" id="f-capacity" class="form-input"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Manager Name</label><input type="text" id="f-manager" class="form-input"></div>
+        <div class="form-group"><label class="form-label">Contact No.</label><input type="text" id="f-contact" class="form-input"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Address</label><input type="text" id="f-address" class="form-input"></div>
+      <div class="form-group"><label class="form-label">Status</label>
+        <select id="f-status" class="form-select"><option value="operational">Operational</option><option value="maintenance">Maintenance</option><option value="closed">Closed</option></select>
+      </div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveItem()"><i class="fas fa-save"></i> Save</button></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allRows=[];
+function sBadge(s){const m={operational:'badge-green',maintenance:'badge-yellow',closed:'badge-red'};return`<span class="badge badge-dot ${m[s]||'badge-gray'}">${s}</span>`;}
+async function loadData(){
+  const tbody=document.getElementById('tbody');
+  tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin" style="font-size:20px;display:block;margin-bottom:8px"></i>Loading…</td></tr>`;
+  try{allRows=await apiGet('/api/warehouses');renderTable(allRows);}
+  catch(e){tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:40px;color:#dc2626">Failed to load</td></tr>`;showToast('Failed: '+e.message,'error');}
+}
+function renderTable(rows){
+  document.getElementById('count').textContent=`${rows.length} warehouse${rows.length!==1?'s':''}`;
+  const tbody=document.getElementById('tbody');
+  if(!rows.length){tbody.innerHTML=`<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon"><i class="fas fa-warehouse"></i></div><h3>No warehouses</h3></div></td></tr>`;return;}
+  tbody.innerHTML=rows.map(r=>`<tr>
+    <td><b style="color:var(--emerald-700)">#${r.Warehouse_ID}</b></td><td><b>${r.Warehouse_Name}</b></td><td>${r.City||'—'}</td>
+    <td><span style="font-weight:600">${r.Capacity_Tons||0}</span> tons</td><td>${r.Manager_Name||'—'}</td>
+    <td>${sBadge(r.Status)}</td>
+    ${window.CAN_WRITE?`<td><button class="action-btn action-btn-edit" onclick="openEdit(${r.Warehouse_ID})" title="Edit"><i class="fas fa-pen"></i></button><button class="action-btn action-btn-delete" onclick="del(${r.Warehouse_ID})" style="margin-left:4px" title="Delete"><i class="fas fa-trash"></i></button></td>`:''}
+  </tr>`).join('');
+}
+function filterTable(){const q=document.getElementById('search-input').value.toLowerCase();const st=document.getElementById('status-filter').value;renderTable(allRows.filter(r=>(r.Warehouse_Name||'').toLowerCase().includes(q)||(r.City||'').toLowerCase().includes(q)).filter(r=>!st||r.Status===st));}
+function openAddModal(){document.getElementById('modal-title').textContent='Add Warehouse';document.getElementById('edit-id').value='';['f-id','f-name','f-city','f-capacity','f-manager','f-contact','f-address'].forEach(i=>document.getElementById(i).value='');document.getElementById('f-status').value='operational';document.getElementById('f-id').disabled=false;document.getElementById('item-modal').classList.remove('hidden');}
+function openEdit(id){const r=allRows.find(x=>x.Warehouse_ID==id);if(!r)return;document.getElementById('modal-title').textContent='Edit Warehouse';document.getElementById('edit-id').value=id;document.getElementById('f-id').value=r.Warehouse_ID;document.getElementById('f-name').value=r.Warehouse_Name;document.getElementById('f-city').value=r.City||'';document.getElementById('f-capacity').value=r.Capacity_Tons||0;document.getElementById('f-manager').value=r.Manager_Name||'';document.getElementById('f-contact').value=r.Contact_No||'';document.getElementById('f-address').value=r.Address||'';document.getElementById('f-status').value=r.Status;document.getElementById('f-id').disabled=true;document.getElementById('item-modal').classList.remove('hidden');}
+function closeModal(){document.getElementById('item-modal').classList.add('hidden');}
+async function saveItem(){
+  const editId=document.getElementById('edit-id').value;
+  const p={Warehouse_ID:parseInt(document.getElementById('f-id').value),Warehouse_Name:document.getElementById('f-name').value.trim(),City:document.getElementById('f-city').value,Capacity_Tons:parseFloat(document.getElementById('f-capacity').value)||0,Manager_Name:document.getElementById('f-manager').value,Contact_No:document.getElementById('f-contact').value,Address:document.getElementById('f-address').value,Status:document.getElementById('f-status').value};
+  if(!p.Warehouse_Name){showToast('Name required','error');return;}
+  try{const res=editId?await apiPut(`/api/warehouses/${editId}`,p):await apiPost('/api/warehouses',p);if(res.success){showToast(editId?'Updated!':'Added!','success');closeModal();loadData();}else showToast(res.error||'Failed','error');}catch(e){showToast('Network error','error');}
+}
+async function del(id){if(!confirm(`Delete warehouse #${id}?`))return;try{const r=await apiDelete(`/api/warehouses/${id}`);if(r.success){showToast('Deleted','success');loadData();}else showToast(r.error||'Failed','error');}catch(e){showToast('Network error','error');}}
+loadData();
+</script>
+{% endblock %}

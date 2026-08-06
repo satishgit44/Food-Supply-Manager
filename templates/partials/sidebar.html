@@ -1,0 +1,75 @@
+<!-- ======================================================
+     SHARED DARK SIDEBAR — include with partials/sidebar.html
+     Pass: active_page = 'dashboard' | 'products' | etc.
+     ====================================================== -->
+<aside class="sidebar">
+  <!-- Logo -->
+  <div class="sidebar-logo">
+    <div class="sidebar-logo-icon">
+      <i class="fas fa-leaf"></i>
+    </div>
+    <div class="sidebar-logo-text">
+      <h2>FoodSupply</h2>
+      <p>Management System</p>
+    </div>
+  </div>
+
+  <!-- Navigation -->
+  <nav class="sidebar-nav">
+    <div class="nav-section-label">Main Menu</div>
+
+    <a href="/dashboard"    class="nav-item {% if active_page=='dashboard'    %}active{% endif %}">
+      <i class="fas fa-chart-line nav-icon"></i><span>Dashboard</span>
+    </a>
+    <a href="/suppliers"    class="nav-item {% if active_page=='suppliers'    %}active{% endif %}">
+      <i class="fas fa-truck nav-icon"></i><span>Suppliers</span>
+    </a>
+    <a href="/products"     class="nav-item {% if active_page=='products'     %}active{% endif %}">
+      <i class="fas fa-box nav-icon"></i><span>Products</span>
+    </a>
+    <a href="/categories"   class="nav-item {% if active_page=='categories'   %}active{% endif %}">
+      <i class="fas fa-tags nav-icon"></i><span>Categories</span>
+    </a>
+
+    <div class="nav-section-label" style="margin-top:8px">Logistics</div>
+
+    <a href="/warehouses"   class="nav-item {% if active_page=='warehouses'   %}active{% endif %}">
+      <i class="fas fa-warehouse nav-icon"></i><span>Warehouses</span>
+    </a>
+    <a href="/inventory"    class="nav-item {% if active_page=='inventory'    %}active{% endif %}">
+      <i class="fas fa-layer-group nav-icon"></i><span>Inventory</span>
+    </a>
+    <a href="/distributors" class="nav-item {% if active_page=='distributors' %}active{% endif %}">
+      <i class="fas fa-shipping-fast nav-icon"></i><span>Distributors</span>
+    </a>
+
+    <div class="nav-section-label" style="margin-top:8px">Sales</div>
+
+    <a href="/customers"    class="nav-item {% if active_page=='customers'    %}active{% endif %}">
+      <i class="fas fa-users nav-icon"></i><span>Customers</span>
+    </a>
+    <a href="/orders"       class="nav-item {% if active_page=='orders'       %}active{% endif %}">
+      <i class="fas fa-shopping-cart nav-icon"></i><span>Orders</span>
+    </a>
+    <a href="/payments"     class="nav-item {% if active_page=='payments'     %}active{% endif %}">
+      <i class="fas fa-credit-card nav-icon"></i><span>Payments</span>
+    </a>
+    <a href="/reports"      class="nav-item {% if active_page=='reports'      %}active{% endif %}">
+      <i class="fas fa-chart-bar nav-icon"></i><span>Reports</span>
+    </a>
+
+    {% if is_admin %}
+    <div class="nav-section-label" style="margin-top:8px">Admin</div>
+    <a href="/users"        class="nav-item {% if active_page=='users'        %}active{% endif %}">
+      <i class="fas fa-user-shield nav-icon"></i><span>Users</span>
+    </a>
+    {% endif %}
+  </nav>
+
+  <!-- Footer / User -->
+  <div class="sidebar-footer">
+    <a href="/logout" class="nav-item" style="color:#f87171;">
+      <i class="fas fa-sign-out-alt nav-icon" style="color:#f87171;"></i><span>Logout</span>
+    </a>
+  </div>
+</aside>

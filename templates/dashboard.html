@@ -1,0 +1,173 @@
+{% extends "base.html" %}
+{% block title %}Dashboard — Food Supply Manager{% endblock %}
+
+{% block body %}
+<div class="app-shell">
+  {% set active_page = 'dashboard' %}
+  {% include 'partials/sidebar.html' %}
+
+  <div class="main-content">
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1>Dashboard</h1>
+        <p>Welcome back, <strong>{{ current_user.username }}</strong> 👋</p>
+      </div>
+      <div class="topbar-actions">
+        <button class="topbar-btn" title="Refresh" onclick="loadAll()"><i class="fas fa-rotate-right"></i></button>
+        <div style="position:relative">
+          <div class="user-chip" onclick="toggleUserDropdown(event)">
+            <div class="user-chip-avatar">{{ current_user.username[0].upper() }}</div>
+            <span class="user-chip-name">{{ current_user.username }}</span>
+            <i class="fas fa-chevron-down" style="font-size:10px;color:var(--text-muted);margin-left:4px"></i>
+          </div>
+          <div id="user-dropdown" class="user-dropdown hidden">
+            <div style="padding:12px 14px;border-bottom:1px solid var(--border)">
+              <div style="font-size:13px;font-weight:700">{{ current_user.username }}</div>
+              <div style="font-size:11px;color:var(--text-muted);margin-top:2px">{{ current_user.role | capitalize }}</div>
+            </div>
+            {% if is_admin %}
+            <a class="dropdown-item" href="/users">
+              <i class="fas fa-user-shield" style="width:16px;color:#7c3aed"></i> Manage Users
+            </a>
+            {% endif %}
+            <div class="dropdown-divider"></div>
+            <a class="dropdown-item danger" href="/logout">
+              <i class="fas fa-sign-out-alt" style="width:16px"></i> Sign Out
+            </a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- Content -->
+    <div class="content-scroll page-content">
+
+      <!-- KPI Stats -->
+      <div class="stat-grid" id="stats-grid">
+        <div class="stat-card"><div class="stat-icon emerald"><i class="fas fa-truck"></i></div><div class="stat-info"><div class="stat-value" id="s-suppliers">—</div><div class="stat-label">Suppliers</div></div></div>
+        <div class="stat-card"><div class="stat-icon blue"><i class="fas fa-box"></i></div><div class="stat-info"><div class="stat-value" id="s-products">—</div><div class="stat-label">Products</div></div></div>
+        <div class="stat-card"><div class="stat-icon purple"><i class="fas fa-users"></i></div><div class="stat-info"><div class="stat-value" id="s-customers">—</div><div class="stat-label">Customers</div></div></div>
+        <div class="stat-card"><div class="stat-icon orange"><i class="fas fa-shopping-cart"></i></div><div class="stat-info"><div class="stat-value" id="s-orders">—</div><div class="stat-label">Total Orders</div></div></div>
+        <div class="stat-card"><div class="stat-icon teal"><i class="fas fa-warehouse"></i></div><div class="stat-info"><div class="stat-value" id="s-warehouses">—</div><div class="stat-label">Warehouses</div></div></div>
+        <div class="stat-card"><div class="stat-icon rose"><i class="fas fa-shipping-fast"></i></div><div class="stat-info"><div class="stat-value" id="s-distributors">—</div><div class="stat-label">Distributors</div></div></div>
+        <div class="stat-card"><div class="stat-icon emerald"><i class="fas fa-indian-rupee-sign"></i></div><div class="stat-info"><div class="stat-value" id="s-revenue">—</div><div class="stat-label">Revenue</div></div></div>
+        <div class="stat-card"><div class="stat-icon orange"><i class="fas fa-clock"></i></div><div class="stat-info"><div class="stat-value" id="s-pending">—</div><div class="stat-label">Pending Orders</div></div></div>
+      </div>
+
+      <!-- Two-column layout -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:20px">
+        <!-- Recent Orders -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title"><i class="fas fa-shopping-cart" style="color:var(--emerald-500);margin-right:8px"></i>Recent Orders</h2>
+            <a href="/orders" class="btn btn-ghost btn-sm">View All</a>
+          </div>
+          <div class="data-table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Order ID</th><th>Customer</th><th>Amount</th><th>Status</th></tr></thead>
+              <tbody id="recent-orders-body">
+                <tr><td colspan="4" class="empty-state" style="text-align:center;padding:24px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Low Stock Alert -->
+        <div class="card">
+          <div class="card-header">
+            <h2 class="card-title"><i class="fas fa-triangle-exclamation" style="color:#f59e0b;margin-right:8px"></i>Low Stock Alerts</h2>
+            <a href="/inventory" class="btn btn-ghost btn-sm">View Inventory</a>
+          </div>
+          <div class="data-table-wrap">
+            <table class="data-table">
+              <thead><tr><th>Product</th><th>Warehouse</th><th>Stock</th><th>Status</th></tr></thead>
+              <tbody id="low-stock-body">
+                <tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title"><i class="fas fa-bolt" style="color:var(--emerald-500);margin-right:8px"></i>Quick Actions</h2>
+        </div>
+        <div class="card-body" style="display:flex;gap:12px;flex-wrap:wrap">
+          <a href="/products"  class="btn btn-primary"><i class="fas fa-plus"></i> Add Product</a>
+          <a href="/orders"    class="btn btn-ghost"><i class="fas fa-shopping-cart"></i> New Order</a>
+          <a href="/suppliers" class="btn btn-ghost"><i class="fas fa-truck"></i> Suppliers</a>
+          <a href="/inventory" class="btn btn-ghost"><i class="fas fa-layer-group"></i> Check Inventory</a>
+          <a href="/reports"   class="btn btn-ghost"><i class="fas fa-chart-bar"></i> View Reports</a>
+        </div>
+      </div>
+
+    </div><!-- /content-scroll -->
+  </div><!-- /main-content -->
+</div><!-- /app-shell -->
+{% endblock %}
+
+{% block scripts %}
+<script>
+function statusBadge(s) {
+  const m = { pending:'badge-yellow', confirmed:'badge-blue', shipped:'badge-purple',
+              delivered:'badge-green', cancelled:'badge-red' };
+  return `<span class="badge badge-dot ${m[s]||'badge-gray'}">${s}</span>`;
+}
+function stockBadge(s) {
+  const m = { 'LOW STOCK':'badge-yellow', 'OUT OF STOCK':'badge-red', 'OK':'badge-green' };
+  return `<span class="badge badge-dot ${m[s]||'badge-gray'}">${s}</span>`;
+}
+
+async function loadStats() {
+  try {
+    const d = await apiGet('/api/dashboard-stats');
+    const fmt = v => v >= 1000 ? '₹' + (v/1000).toFixed(1) + 'k' : String(v);
+    document.getElementById('s-suppliers').textContent   = d.active_suppliers   ?? '—';
+    document.getElementById('s-products').textContent    = d.available_products  ?? '—';
+    document.getElementById('s-customers').textContent   = d.total_customers     ?? '—';
+    document.getElementById('s-orders').textContent      = d.total_orders        ?? '—';
+    document.getElementById('s-warehouses').textContent  = d.active_warehouses   ?? '—';
+    document.getElementById('s-distributors').textContent= d.active_distributors ?? '—';
+    document.getElementById('s-revenue').textContent     = d.total_revenue != null ? '₹'+Number(d.total_revenue).toLocaleString('en-IN') : '—';
+    document.getElementById('s-pending').textContent     = d.pending_orders      ?? '—';
+  } catch(e) { console.warn('Stats error', e); }
+}
+
+async function loadRecentOrders() {
+  try {
+    const orders = await apiGet('/api/orders');
+    const recent = orders.slice(0, 6);
+    const tbody = document.getElementById('recent-orders-body');
+    if (!recent.length) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--text-muted)">No orders yet</td></tr>'; return; }
+    tbody.innerHTML = recent.map(o => `
+      <tr>
+        <td><span style="font-weight:600">#${o.Order_ID}</span></td>
+        <td>${o.Customer_Name || o.Customer_ID}</td>
+        <td style="font-weight:600">₹${Number(o.Total_Amount||0).toLocaleString('en-IN')}</td>
+        <td>${statusBadge(o.Status)}</td>
+      </tr>`).join('');
+  } catch(e) { document.getElementById('recent-orders-body').innerHTML = '<tr><td colspan="4" style="text-align:center;color:#dc2626;padding:24px">Failed to load</td></tr>'; }
+}
+
+async function loadLowStock() {
+  try {
+    const rows = await apiGet('/api/inventory/low-stock');
+    const tbody = document.getElementById('low-stock-body');
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:24px;color:var(--emerald-600)"><i class="fas fa-circle-check"></i> All stock levels OK</td></tr>'; return; }
+    tbody.innerHTML = rows.map(r => `
+      <tr>
+        <td style="font-weight:600">${r.Product_Name}</td>
+        <td>${r.Warehouse_Name||'—'}</td>
+        <td>${r.Quantity}</td>
+        <td>${stockBadge(r.Stock_Status)}</td>
+      </tr>`).join('');
+  } catch(e) { document.getElementById('low-stock-body').innerHTML = '<tr><td colspan="4" style="text-align:center;color:#dc2626;padding:24px">Failed to load</td></tr>'; }
+}
+
+function loadAll() { loadStats(); loadRecentOrders(); loadLowStock(); }
+loadAll();
+</script>
+{% endblock %}

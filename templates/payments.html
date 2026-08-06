@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% block title %}Payments — Food Supply Manager{% endblock %}
+
+{% block body %}
+<div class="app-shell">
+  {% set active_page = 'payments' %}
+  {% include 'partials/sidebar.html' %}
+
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-title"><h1>Payments</h1><p>Track order payments and status</p></div>
+      <div class="topbar-actions">
+        {% if can_write %}<button class="btn btn-primary" onclick="openAddModal()"><i class="fas fa-plus"></i> Record Payment</button>{% endif %}
+        <div style="position:relative">
+          <div class="user-chip" onclick="toggleUserDropdown(event)"><div class="user-chip-avatar">{{ current_user.username[0].upper() }}</div><span class="user-chip-name">{{ current_user.username }}</span></div>
+          <div id="user-dropdown" class="user-dropdown hidden">
+            <div class="dropdown-divider"></div>
+            <a class="dropdown-item danger" href="/logout"><i class="fas fa-sign-out-alt" style="width:16px"></i> Sign Out</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="content-scroll page-content">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-body" style="padding:14px 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="search-bar" style="flex:1;min-width:200px"><i class="fas fa-search"></i><input type="text" id="search-input" class="search-input" placeholder="Search by customer, order, reference…" oninput="filterTable()"></div>
+          <select id="method-filter" class="form-select" style="width:160px;padding:9px 12px" onchange="filterTable()">
+            <option value="">All Methods</option><option value="cash">Cash</option><option value="card">Card</option><option value="upi">UPI</option><option value="bank_transfer">Bank Transfer</option><option value="cheque">Cheque</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="loadData()"><i class="fas fa-rotate-right"></i> Refresh</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2 class="card-title"><i class="fas fa-credit-card" style="color:var(--emerald-500);margin-right:8px"></i>Payment Transactions</h2><span id="count" style="font-size:12px;color:var(--text-muted);font-weight:600"></span></div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Payment ID</th><th>Order ID</th><th>Customer</th><th>Amount</th><th>Method</th><th>Ref</th><th>Date</th><th>Status</th>{% if can_write %}<th>Actions</th>{% endif %}</tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="item-modal" class="modal-backdrop hidden" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header"><h3 class="modal-title" id="modal-title">Record Payment</h3><button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-id">
+      <div class="form-group"><label class="form-label">Order *</label><select id="f-order" class="form-select"><option value="">— Select Order —</option></select></div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Amount (₹) *</label><input type="number" step="0.01" id="f-amount" class="form-input" value="0.00"></div>
+        <div class="form-group"><label class="form-label">Payment Date *</label><input type="date" id="f-date" class="form-input"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Payment Method</label>
+          <select id="f-method" class="form-select"><option value="cash">Cash</option><option value="card">Card</option><option value="upi">UPI</option><option value="bank_transfer">Bank Transfer</option><option value="cheque">Cheque</option></select>
+        </div>
+        <div class="form-group"><label class="form-label">Payment Status</label>
+          <select id="f-status" class="form-select"><option value="completed">Completed</option><option value="pending">Pending</option><option value="failed">Failed</option><option value="refunded">Refunded</option></select>
+        </div>
+      </div>
+      <div class="form-group"><label class="form-label">Transaction Reference</label><input type="text" id="f-ref" class="form-input" placeholder="e.g. TXN-123456"></div>
+      <div class="form-group"><label class="form-label">Notes</label><input type="text" id="f-notes" class="form-input"></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveItem()"><i class="fas fa-save"></i> Save</button></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allRows=[], orders=[];
+function sBadge(s){
+  const m={completed:'badge-green',pending:'badge-yellow',failed:'badge-red',refunded:'badge-gray'};
+  return`<span class="badge badge-dot ${m[s]||'badge-gray'}">${s}</span>`;
+}
+async function loadData(){
+  const tbody=document.getElementById('tbody');
+  tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin" style="font-size:20px;display:block;margin-bottom:8px"></i>Loading…</td></tr>`;
+  try{allRows=await apiGet('/api/payments');renderTable(allRows);}
+  catch(e){tbody.innerHTML=`<tr><td colspan="9" style="text-align:center;padding:40px;color:#dc2626">Failed to load</td></tr>`;showToast('Failed: '+e.message,'error');}
+}
+function renderTable(rows){
+  document.getElementById('count').textContent=`${rows.length} payment${rows.length!==1?'s':''}`;
+  const tbody=document.getElementById('tbody');
+  if(!rows.length){tbody.innerHTML=`<tr><td colspan="9"><div class="empty-state"><div class="empty-state-icon"><i class="fas fa-credit-card"></i></div><h3>No payments recorded</h3></div></td></tr>`;return;}
+  tbody.innerHTML=rows.map(r=>`<tr>
+    <td><b style="color:var(--emerald-700)">#${r.Payment_ID}</b></td>
+    <td><a href="/orders" style="color:var(--emerald-700);font-weight:600">#${r.Order_ID}</a></td>
+    <td>${r.Customer_Name||'—'}</td>
+    <td style="font-weight:600">₹${Number(r.Amount).toLocaleString('en-IN')}</td>
+    <td><span class="badge badge-gray">${r.Payment_Method.toUpperCase()}</span></td>
+    <td><code>${r.Transaction_Ref||'—'}</code></td>
+    <td>${r.Payment_Date||'—'}</td>
+    <td>${sBadge(r.Payment_Status)}</td>
+    ${window.CAN_WRITE?`<td><button class="action-btn action-btn-edit" onclick="openEdit(${r.Payment_ID})" title="Edit"><i class="fas fa-pen"></i></button><button class="action-btn action-btn-delete" onclick="del(${r.Payment_ID})" style="margin-left:4px" title="Delete"><i class="fas fa-trash"></i></button></td>`:''}
+  </tr>`).join('');
+}
+function filterTable(){
+  const q=document.getElementById('search-input').value.toLowerCase();
+  const mt=document.getElementById('method-filter').value;
+  renderTable(allRows.filter(r=>(r.Customer_Name||'').toLowerCase().includes(q)||String(r.Order_ID).includes(q)||(r.Transaction_Ref||'').toLowerCase().includes(q)).filter(r=>!mt||r.Payment_Method===mt));
+}
+async function loadDropdowns(){
+  try{
+    orders=await apiGet('/api/orders');
+    document.getElementById('f-order').innerHTML='<option value="">— Select Order —</option>'+orders.map(o=>`<option value="${o.Order_ID}" data-total="${o.Total_Amount}">Order #${o.Order_ID} (${o.Customer_Name} - ₹${Number(o.Total_Amount).toLocaleString()})</option>`).join('');
+  }catch(e){}
+  
+  document.getElementById('f-order').addEventListener('change', function(){
+    const opt = this.options[this.selectedIndex];
+    if(opt.dataset.total) document.getElementById('f-amount').value = opt.dataset.total;
+  });
+}
+function openAddModal(){
+  document.getElementById('modal-title').textContent='Record Payment';document.getElementById('edit-id').value='';
+  document.getElementById('f-amount').value=0;document.getElementById('f-date').value=new Date().toISOString().split('T')[0];
+  document.getElementById('f-ref').value='';document.getElementById('f-notes').value='';
+  document.getElementById('f-order').value='';document.getElementById('f-method').value='cash';
+  document.getElementById('f-status').value='completed';document.getElementById('f-order').disabled=false;
+  document.getElementById('item-modal').classList.remove('hidden');
+}
+function openEdit(id){
+  const r=allRows.find(x=>x.Payment_ID==id);if(!r)return;
+  document.getElementById('modal-title').textContent='Edit Payment';document.getElementById('edit-id').value=id;
+  document.getElementById('f-order').value=r.Order_ID;document.getElementById('f-amount').value=r.Amount;
+  document.getElementById('f-date').value=r.Payment_Date||'';document.getElementById('f-method').value=r.Payment_Method;
+  document.getElementById('f-status').value=r.Payment_Status;document.getElementById('f-ref').value=r.Transaction_Ref||'';
+  document.getElementById('f-notes').value=r.Notes||'';document.getElementById('f-order').disabled=true;
+  document.getElementById('item-modal').classList.remove('hidden');
+}
+function closeModal(){document.getElementById('item-modal').classList.add('hidden');}
+async function saveItem(){
+  const editId=document.getElementById('edit-id').value;
+  const p={Order_ID:parseInt(document.getElementById('f-order').value),Amount:parseFloat(document.getElementById('f-amount').value)||0,Payment_Date:document.getElementById('f-date').value,Payment_Method:document.getElementById('f-method').value,Payment_Status:document.getElementById('f-status').value,Transaction_Ref:document.getElementById('f-ref').value,Notes:document.getElementById('f-notes').value};
+  if(!p.Order_ID||!p.Amount||!p.Payment_Date){showToast('Order, Amount and Date are required','error');return;}
+  try{const res=editId?await apiPut(`/api/payments/${editId}`,p):await apiPost('/api/payments',p);if(res.success){showToast(editId?'Updated!':'Recorded!','success');closeModal();loadData();}else showToast(res.error||'Failed','error');}catch(e){showToast('Network error','error');}
+}
+async function del(id){if(!confirm(`Delete payment #${id}?`))return;try{const r=await apiDelete(`/api/payments/${id}`);if(r.success){showToast('Deleted','success');loadData();}else showToast(r.error||'Failed','error');}catch(e){showToast('Network error','error');}}
+loadData();loadDropdowns();
+</script>
+{% endblock %}

@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Inventory — Food Supply Manager{% endblock %}
+
+{% block body %}
+<div class="app-shell">
+  {% set active_page = 'inventory' %}
+  {% include 'partials/sidebar.html' %}
+
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-title"><h1>Inventory</h1><p>Track stock levels in warehouses</p></div>
+      <div class="topbar-actions">
+        {% if can_write %}<button class="btn btn-primary" onclick="openAddModal()"><i class="fas fa-plus"></i> Add Stock Record</button>{% endif %}
+        <div style="position:relative">
+          <div class="user-chip" onclick="toggleUserDropdown(event)"><div class="user-chip-avatar">{{ current_user.username[0].upper() }}</div><span class="user-chip-name">{{ current_user.username }}</span></div>
+          <div id="user-dropdown" class="user-dropdown hidden">
+            <div class="dropdown-divider"></div>
+            <a class="dropdown-item danger" href="/logout"><i class="fas fa-sign-out-alt" style="width:16px"></i> Sign Out</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="content-scroll page-content">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-body" style="padding:14px 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="search-bar" style="flex:1;min-width:200px"><i class="fas fa-search"></i><input type="text" id="search-input" class="search-input" placeholder="Search by product or warehouse…" oninput="filterTable()"></div>
+          <select id="status-filter" class="form-select" style="width:160px;padding:9px 12px" onchange="filterTable()">
+            <option value="">All Statuses</option><option value="IN STOCK">In Stock</option><option value="LOW STOCK">Low Stock</option><option value="OUT OF STOCK">Out of Stock</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="loadData()"><i class="fas fa-rotate-right"></i> Refresh</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2 class="card-title"><i class="fas fa-layer-group" style="color:var(--emerald-500);margin-right:8px"></i>Inventory Status</h2><span id="count" style="font-size:12px;color:var(--text-muted);font-weight:600"></span></div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>Record ID</th><th>Product</th><th>Warehouse</th><th>Qty</th><th>Reorder Level</th><th>Restocked Date</th><th>Status</th>{% if can_write %}<th>Actions</th>{% endif %}</tr></thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="item-modal" class="modal-backdrop hidden" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header"><h3 class="modal-title" id="modal-title">Add Stock</h3><button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-id">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Product *</label><select id="f-product" class="form-select"><option value="">— Select —</option></select></div>
+        <div class="form-group"><label class="form-label">Warehouse *</label><select id="f-warehouse" class="form-select"><option value="">— Select —</option></select></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Quantity</label><input type="number" id="f-qty" class="form-input" value="0"></div>
+        <div class="form-group"><label class="form-label">Reorder Level</label><input type="number" id="f-reorder" class="form-input" value="10"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Last Restocked Date</label><input type="date" id="f-date" class="form-input"></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveItem()"><i class="fas fa-save"></i> Save</button></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allRows=[], products=[], warehouses=[];
+function sBadge(s){
+  const m={'IN STOCK':'badge-green','LOW STOCK':'badge-yellow','OUT OF STOCK':'badge-red'};
+  return`<span class="badge badge-dot ${m[s]||'badge-gray'}">${s}</span>`;
+}
+async function loadData(){
+  const tbody=document.getElementById('tbody');
+  tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin" style="font-size:20px;display:block;margin-bottom:8px"></i>Loading…</td></tr>`;
+  try{allRows=await apiGet('/api/inventory');renderTable(allRows);}
+  catch(e){tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;padding:40px;color:#dc2626">Failed to load</td></tr>`;showToast('Failed: '+e.message,'error');}
+}
+function renderTable(rows){
+  document.getElementById('count').textContent=`${rows.length} record${rows.length!==1?'s':''}`;
+  const tbody=document.getElementById('tbody');
+  if(!rows.length){tbody.innerHTML=`<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon"><i class="fas fa-layer-group"></i></div><h3>No stock records</h3></div></td></tr>`;return;}
+  tbody.innerHTML=rows.map(r=>`<tr>
+    <td><b style="color:var(--emerald-700)">#${r.Inventory_ID}</b></td>
+    <td><b>${r.Product_Name}</b></td><td>${r.Warehouse_Name||'—'}</td>
+    <td style="font-weight:600">${r.Quantity}</td><td>${r.Reorder_Level}</td><td>${r.Last_Restocked||'—'}</td>
+    <td>${sBadge(r.Stock_Status)}</td>
+    ${window.CAN_WRITE?`<td><button class="action-btn action-btn-edit" onclick="openEdit(${r.Inventory_ID})" title="Edit"><i class="fas fa-pen"></i></button><button class="action-btn action-btn-delete" onclick="del(${r.Inventory_ID})" style="margin-left:4px" title="Delete"><i class="fas fa-trash"></i></button></td>`:''}
+  </tr>`).join('');
+}
+function filterTable(){
+  const q=document.getElementById('search-input').value.toLowerCase();
+  const st=document.getElementById('status-filter').value;
+  renderTable(allRows.filter(r=>(r.Product_Name||'').toLowerCase().includes(q)||(r.Warehouse_Name||'').toLowerCase().includes(q)).filter(r=>!st||r.Stock_Status===st));
+}
+async function loadDropdowns(){
+  try{products=await apiGet('/api/products');}catch(e){}
+  try{warehouses=await apiGet('/api/warehouses');}catch(e){}
+  document.getElementById('f-product').innerHTML='<option value="">— Select Product —</option>'+products.map(p=>`<option value="${p.Product_ID}">${p.Product_Name}</option>`).join('');
+  document.getElementById('f-warehouse').innerHTML='<option value="">— Select Warehouse —</option>'+warehouses.map(w=>`<option value="${w.Warehouse_ID}">${w.Warehouse_Name}</option>`).join('');
+}
+function openAddModal(){
+  document.getElementById('modal-title').textContent='Add Stock Record';document.getElementById('edit-id').value='';
+  document.getElementById('f-qty').value=0;document.getElementById('f-reorder').value=10;document.getElementById('f-date').value='';
+  document.getElementById('f-product').value='';document.getElementById('f-warehouse').value='';
+  document.getElementById('f-product').disabled=false;document.getElementById('f-warehouse').disabled=false;
+  document.getElementById('item-modal').classList.remove('hidden');
+}
+function openEdit(id){
+  const r=allRows.find(x=>x.Inventory_ID==id);if(!r)return;
+  document.getElementById('modal-title').textContent='Edit Stock Record';document.getElementById('edit-id').value=id;
+  // Match dropdowns by text name or fetch full details. Since we have local list we can find the matching ID:
+  const pObj = products.find(x => x.Product_Name == r.Product_Name);
+  const wObj = warehouses.find(x => x.Warehouse_Name == r.Warehouse_Name);
+  document.getElementById('f-product').value = pObj ? pObj.Product_ID : '';
+  document.getElementById('f-warehouse').value = wObj ? wObj.Warehouse_ID : '';
+  document.getElementById('f-qty').value=r.Quantity;document.getElementById('f-reorder').value=r.Reorder_Level;
+  document.getElementById('f-date').value=r.Last_Restocked||'';
+  document.getElementById('f-product').disabled=true;document.getElementById('f-warehouse').disabled=true;
+  document.getElementById('item-modal').classList.remove('hidden');
+}
+function closeModal(){document.getElementById('item-modal').classList.add('hidden');}
+async function saveItem(){
+  const editId=document.getElementById('edit-id').value;
+  const p={Product_ID:parseInt(document.getElementById('f-product').value),Warehouse_ID:parseInt(document.getElementById('f-warehouse').value),Quantity:parseInt(document.getElementById('f-qty').value)||0,Reorder_Level:parseInt(document.getElementById('f-reorder').value)||10,Last_Restocked:document.getElementById('f-date').value||null};
+  if(!p.Product_ID||!p.Warehouse_ID){showToast('Product and Warehouse are required','error');return;}
+  try{const res=editId?await apiPut(`/api/inventory/${editId}`,p):await apiPost('/api/inventory',p);if(res.success){showToast(editId?'Updated!':'Added!','success');closeModal();loadData();}else showToast(res.error||'Failed','error');}catch(e){showToast('Network error','error');}
+}
+async function del(id){if(!confirm(`Delete this inventory record?`))return;try{const r=await apiDelete(`/api/inventory/${id}`);if(r.success){showToast('Deleted','success');loadData();}else showToast(r.error||'Failed','error');}catch(e){showToast('Network error','error');}}
+loadData();loadDropdowns();
+</script>
+{% endblock %}

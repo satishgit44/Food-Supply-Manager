@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Suppliers — Food Supply Manager{% endblock %}
+
+{% block body %}
+<div class="app-shell">
+  {% set active_page = 'suppliers' %}
+  {% include 'partials/sidebar.html' %}
+
+  <div class="main-content">
+    <header class="topbar">
+      <div class="topbar-title"><h1>Suppliers</h1><p>Manage your supplier network</p></div>
+      <div class="topbar-actions">
+        {% if can_write %}<button class="btn btn-primary" onclick="openAddModal()"><i class="fas fa-plus"></i> Add Supplier</button>{% endif %}
+        <div style="position:relative">
+          <div class="user-chip" onclick="toggleUserDropdown(event)"><div class="user-chip-avatar">{{ current_user.username[0].upper() }}</div><span class="user-chip-name">{{ current_user.username }}</span></div>
+          <div id="user-dropdown" class="user-dropdown hidden">
+            <div class="dropdown-divider"></div>
+            <a class="dropdown-item danger" href="/logout"><i class="fas fa-sign-out-alt" style="width:16px"></i> Sign Out</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="content-scroll page-content">
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-body" style="padding:14px 20px;display:flex;gap:12px;align-items:center">
+          <div class="search-bar" style="flex:1"><i class="fas fa-search"></i><input type="text" id="search-input" class="search-input" placeholder="Search suppliers…" oninput="filterTable()"></div>
+          <select id="status-filter" class="form-select" style="width:160px;padding:9px 12px" onchange="filterTable()">
+            <option value="">All Statuses</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="loadData()"><i class="fas fa-rotate-right"></i></button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><h2 class="card-title"><i class="fas fa-truck" style="color:var(--emerald-500);margin-right:8px"></i>Supplier List</h2><span id="count" style="font-size:12px;color:var(--text-muted);font-weight:600"></span></div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>ID</th><th>Name</th><th>City</th><th>Contact</th><th>Email</th><th>Status</th>{% if can_write %}<th>Actions</th>{% endif %}</tr></thead>
+            <tbody id="tbody"><tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin" style="font-size:20px;display:block;margin-bottom:8px"></i>Loading…</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="item-modal" class="modal-backdrop hidden" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header"><h3 class="modal-title" id="modal-title">Add Supplier</h3><button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button></div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-id">
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">Supplier ID *</label><input type="number" id="f-id" class="form-input" placeholder="e.g. 1"></div>
+        <div class="form-group"><label class="form-label">Supplier Name *</label><input type="text" id="f-name" class="form-input" placeholder="Name"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label class="form-label">City</label><input type="text" id="f-city" class="form-input" placeholder="City"></div>
+        <div class="form-group"><label class="form-label">Contact No.</label><input type="text" id="f-contact" class="form-input" placeholder="+91 …"></div>
+      </div>
+      <div class="form-group"><label class="form-label">Email</label><input type="email" id="f-email" class="form-input" placeholder="email@example.com"></div>
+      <div class="form-group"><label class="form-label">Address</label><input type="text" id="f-address" class="form-input" placeholder="Full address"></div>
+      <div class="form-group"><label class="form-label">Status</label><select id="f-status" class="form-select"><option value="active">Active</option><option value="inactive">Inactive</option><option value="suspended">Suspended</option></select></div>
+    </div>
+    <div class="modal-footer"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-primary" onclick="saveItem()"><i class="fas fa-save"></i> Save</button></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allRows = [];
+function sBadge(s){const m={active:'badge-green',inactive:'badge-gray',suspended:'badge-red'};return`<span class="badge badge-dot ${m[s]||'badge-gray'}">${s}</span>`;}
+async function loadData(){
+  const tbody=document.getElementById('tbody');
+  tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin" style="font-size:20px;display:block;margin-bottom:8px"></i>Loading…</td></tr>`;
+  try{allRows=await apiGet('/api/suppliers');renderTable(allRows);}
+  catch(e){tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:40px;color:#dc2626"><i class="fas fa-circle-xmark" style="display:block;font-size:24px;margin-bottom:8px"></i>Failed to load</td></tr>`;showToast('Failed: '+e.message,'error');}
+}
+function renderTable(rows){
+  document.getElementById('count').textContent=`${rows.length} supplier${rows.length!==1?'s':''}`;
+  const tbody=document.getElementById('tbody');
+  if(!rows.length){tbody.innerHTML=`<tr><td colspan="7"><div class="empty-state"><div class="empty-state-icon"><i class="fas fa-truck"></i></div><h3>No suppliers</h3><p>Add your first supplier</p></div></td></tr>`;return;}
+  tbody.innerHTML=rows.map(r=>`<tr>
+    <td><b style="color:var(--emerald-700)">#${r.Supplier_ID}</b></td>
+    <td><b>${r.Supplier_Name}</b></td><td>${r.City||'—'}</td><td>${r.Contact_No||'—'}</td><td>${r.Email||'—'}</td>
+    <td>${sBadge(r.Status)}</td>
+    ${window.CAN_WRITE?`<td><button class="action-btn action-btn-edit" onclick="openEdit(${r.Supplier_ID})" title="Edit"><i class="fas fa-pen"></i></button><button class="action-btn action-btn-delete" onclick="del(${r.Supplier_ID})" style="margin-left:4px" title="Delete"><i class="fas fa-trash"></i></button></td>`:''}
+  </tr>`).join('');
+}
+function filterTable(){
+  const q=document.getElementById('search-input').value.toLowerCase();
+  const st=document.getElementById('status-filter').value;
+  renderTable(allRows.filter(r=>(r.Supplier_Name||'').toLowerCase().includes(q)||(r.City||'').toLowerCase().includes(q)).filter(r=>!st||r.Status===st));
+}
+function openAddModal(){document.getElementById('modal-title').textContent='Add Supplier';document.getElementById('edit-id').value='';['f-id','f-name','f-city','f-contact','f-email','f-address'].forEach(i=>document.getElementById(i).value='');document.getElementById('f-status').value='active';document.getElementById('f-id').disabled=false;document.getElementById('item-modal').classList.remove('hidden');}
+function openEdit(id){const r=allRows.find(x=>x.Supplier_ID==id);if(!r)return;document.getElementById('modal-title').textContent='Edit Supplier';document.getElementById('edit-id').value=id;document.getElementById('f-id').value=r.Supplier_ID;document.getElementById('f-name').value=r.Supplier_Name;document.getElementById('f-city').value=r.City||'';document.getElementById('f-contact').value=r.Contact_No||'';document.getElementById('f-email').value=r.Email||'';document.getElementById('f-address').value=r.Address||'';document.getElementById('f-status').value=r.Status;document.getElementById('f-id').disabled=true;document.getElementById('item-modal').classList.remove('hidden');}
+function closeModal(){document.getElementById('item-modal').classList.add('hidden');}
+async function saveItem(){
+  const editId=document.getElementById('edit-id').value;
+  const p={Supplier_ID:parseInt(document.getElementById('f-id').value),Supplier_Name:document.getElementById('f-name').value.trim(),City:document.getElementById('f-city').value,Contact_No:document.getElementById('f-contact').value,Email:document.getElementById('f-email').value,Address:document.getElementById('f-address').value,Status:document.getElementById('f-status').value};
+  if(!p.Supplier_Name){showToast('Name required','error');return;}
+  try{const res=editId?await apiPut(`/api/suppliers/${editId}`,p):await apiPost('/api/suppliers',p);if(res.success){showToast(editId?'Updated!':'Added!','success');closeModal();loadData();}else showToast(res.error||'Failed','error');}catch(e){showToast('Network error','error');}
+}
+async function del(id){if(!confirm(`Delete supplier #${id}?`))return;try{const r=await apiDelete(`/api/suppliers/${id}`);if(r.success){showToast('Deleted','success');loadData();}else showToast(r.error||'Failed','error');}catch(e){showToast('Network error','error');}}
+loadData();
+</script>
+{% endblock %}

@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+{% block title %}Products — Food Supply Manager{% endblock %}
+
+{% block body %}
+<div class="app-shell">
+  {% set active_page = 'products' %}
+  {% include 'partials/sidebar.html' %}
+
+  <div class="main-content">
+    <!-- Topbar -->
+    <header class="topbar">
+      <div class="topbar-title">
+        <h1>Products</h1>
+        <p>Manage your product catalog</p>
+      </div>
+      <div class="topbar-actions">
+        {% if can_write %}
+        <button class="btn btn-primary" onclick="openAddModal()">
+          <i class="fas fa-plus"></i> Add Product
+        </button>
+        {% endif %}
+        <div style="position:relative">
+          <div class="user-chip" onclick="toggleUserDropdown(event)">
+            <div class="user-chip-avatar">{{ current_user.username[0].upper() }}</div>
+            <span class="user-chip-name">{{ current_user.username }}</span>
+            <i class="fas fa-chevron-down" style="font-size:10px;color:var(--text-muted);margin-left:4px"></i>
+          </div>
+          <div id="user-dropdown" class="user-dropdown hidden">
+            <div class="dropdown-divider"></div>
+            <a class="dropdown-item danger" href="/logout"><i class="fas fa-sign-out-alt" style="width:16px"></i> Sign Out</a>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <div class="content-scroll page-content">
+
+      <!-- Filter bar -->
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-body" style="padding:14px 20px;display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+          <div class="search-bar" style="flex:1;min-width:200px">
+            <i class="fas fa-search"></i>
+            <input type="text" id="search-input" class="search-input" placeholder="Search products by name or category…" oninput="filterTable()">
+          </div>
+          <select id="status-filter" class="form-select" style="width:160px;padding:9px 12px" onchange="filterTable()">
+            <option value="">All Statuses</option>
+            <option value="available">Available</option>
+            <option value="out_of_stock">Out of Stock</option>
+            <option value="discontinued">Discontinued</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="loadProducts()"><i class="fas fa-rotate-right"></i> Refresh</button>
+        </div>
+      </div>
+
+      <!-- Table card -->
+      <div class="card">
+        <div class="card-header">
+          <h2 class="card-title"><i class="fas fa-box" style="color:var(--emerald-500);margin-right:8px"></i>Product Catalog</h2>
+          <span id="product-count" style="font-size:12px;color:var(--text-muted);font-weight:600"></span>
+        </div>
+        <div class="data-table-wrap">
+          <table class="data-table" id="products-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Product Name</th>
+                <th>Category</th>
+                <th>Supplier</th>
+                <th>Price</th>
+                <th>Unit</th>
+                <th>Status</th>
+                {% if can_write %}<th>Actions</th>{% endif %}
+              </tr>
+            </thead>
+            <tbody id="products-tbody">
+              <tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)">
+                <i class="fas fa-spinner fa-spin" style="font-size:24px;margin-bottom:12px;display:block"></i>Loading products…
+              </td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Modal -->
+<div id="product-modal" class="modal-backdrop hidden" onclick="if(event.target===this)closeModal()">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 class="modal-title" id="modal-title">Add Product</h3>
+      <button class="modal-close" onclick="closeModal()"><i class="fas fa-times"></i></button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="edit-id">
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Product ID *</label>
+          <input type="number" id="f-pid" class="form-input" placeholder="e.g. 101">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Product Name *</label>
+          <input type="text" id="f-name" class="form-input" placeholder="e.g. Basmati Rice">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <select id="f-cat" class="form-select">
+            <option value="">— Select Category —</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Supplier</label>
+          <select id="f-supplier" class="form-select">
+            <option value="">— Select Supplier —</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Price (₹)</label>
+          <input type="number" step="0.01" id="f-price" class="form-input" placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Unit</label>
+          <select id="f-unit" class="form-select">
+            <option value="kg">kg</option>
+            <option value="litre">litre</option>
+            <option value="piece">piece</option>
+            <option value="dozen">dozen</option>
+            <option value="box">box</option>
+            <option value="bag">bag</option>
+            <option value="ton">ton</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="form-label">Status</label>
+        <select id="f-status" class="form-select">
+          <option value="available">Available</option>
+          <option value="out_of_stock">Out of Stock</option>
+          <option value="discontinued">Discontinued</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-primary" onclick="saveProduct()"><i class="fas fa-save"></i> Save</button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let allProducts = [];
+
+function statusBadge(s) {
+  const m = { available:'badge-green', out_of_stock:'badge-red', discontinued:'badge-gray' };
+  const labels = { available:'Available', out_of_stock:'Out of Stock', discontinued:'Discontinued' };
+  return `<span class="badge badge-dot ${m[s]||'badge-gray'}">${labels[s]||s}</span>`;
+}
+
+async function loadProducts() {
+  const tbody = document.getElementById('products-tbody');
+  tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin" style="font-size:20px;margin-bottom:10px;display:block"></i>Loading…</td></tr>`;
+  try {
+    allProducts = await apiGet('/api/products');
+    renderTable(allProducts);
+  } catch(e) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:40px;color:#dc2626"><i class="fas fa-circle-xmark" style="font-size:24px;display:block;margin-bottom:10px"></i>Failed to load products. ${e.message}</td></tr>`;
+    showToast('Failed to load products: ' + e.message, 'error');
+  }
+}
+
+function renderTable(rows) {
+  const tbody = document.getElementById('products-tbody');
+  document.getElementById('product-count').textContent = `${rows.length} item${rows.length!==1?'s':''}`;
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="empty-state-icon"><i class="fas fa-box-open"></i></div><h3>No products found</h3><p>Add your first product to get started</p></div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = rows.map(p => `
+    <tr>
+      <td><span style="font-weight:700;color:var(--emerald-700)">#${p.Product_ID}</span></td>
+      <td><span style="font-weight:600">${p.Product_Name}</span></td>
+      <td>${p.Category_Name ? `<span class="badge badge-blue">${p.Category_Name}</span>` : (p.Category ? `<span class="badge badge-gray">${p.Category}</span>` : '<span class="text-muted">—</span>')}</td>
+      <td>${p.Supplier_Name || '<span class="text-muted">—</span>'}</td>
+      <td style="font-weight:600">₹${Number(p.Price||0).toLocaleString('en-IN')}</td>
+      <td><span class="badge badge-gray">${p.Unit||'kg'}</span></td>
+      <td>${statusBadge(p.Status||'available')}</td>
+      ${window.CAN_WRITE ? `<td style="white-space:nowrap">
+        <button class="action-btn action-btn-edit" onclick="openEditModal(${p.Product_ID})" title="Edit"><i class="fas fa-pen"></i></button>
+        <button class="action-btn action-btn-delete" onclick="deleteProduct(${p.Product_ID})" title="Delete" style="margin-left:4px"><i class="fas fa-trash"></i></button>
+      </td>` : ''}
+    </tr>`).join('');
+}
+
+function filterTable() {
+  const q = document.getElementById('search-input').value.toLowerCase();
+  const st = document.getElementById('status-filter').value;
+  const filtered = allProducts.filter(p =>
+    (p.Product_Name||'').toLowerCase().includes(q) ||
+    (p.Category||'').toLowerCase().includes(q) ||
+    (p.Category_Name||'').toLowerCase().includes(q) ||
+    String(p.Product_ID).includes(q)
+  ).filter(p => !st || (p.Status||'available') === st);
+  renderTable(filtered);
+}
+
+let categories = [], suppliers = [];
+
+async function loadDropdowns() {
+  try { categories = await apiGet('/api/categories'); } catch(e) {}
+  try { suppliers  = await apiGet('/api/suppliers'); }  catch(e) {}
+  const catSel = document.getElementById('f-cat');
+  const supSel = document.getElementById('f-supplier');
+  catSel.innerHTML = '<option value="">— Select Category —</option>' + categories.map(c => `<option value="${c.Category_ID}">${c.Category_Name}</option>`).join('');
+  supSel.innerHTML = '<option value="">— Select Supplier —</option>' + suppliers.map(s => `<option value="${s.Supplier_ID}">${s.Supplier_Name}</option>`).join('');
+}
+
+function openAddModal() {
+  document.getElementById('modal-title').textContent = 'Add Product';
+  document.getElementById('edit-id').value = '';
+  ['f-pid','f-name','f-price'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-cat').value = '';
+  document.getElementById('f-supplier').value = '';
+  document.getElementById('f-unit').value = 'kg';
+  document.getElementById('f-status').value = 'available';
+  document.getElementById('f-pid').disabled = false;
+  document.getElementById('product-modal').classList.remove('hidden');
+}
+
+function openEditModal(id) {
+  const p = allProducts.find(x => x.Product_ID == id);
+  if (!p) return;
+  document.getElementById('modal-title').textContent = 'Edit Product';
+  document.getElementById('edit-id').value    = id;
+  document.getElementById('f-pid').value      = p.Product_ID;
+  document.getElementById('f-name').value     = p.Product_Name;
+  document.getElementById('f-cat').value      = p.Category_ID || '';
+  document.getElementById('f-supplier').value = p.Supplier_ID || '';
+  document.getElementById('f-price').value    = p.Price || 0;
+  document.getElementById('f-unit').value     = p.Unit || 'kg';
+  document.getElementById('f-status').value   = p.Status || 'available';
+  document.getElementById('f-pid').disabled   = true;
+  document.getElementById('product-modal').classList.remove('hidden');
+}
+
+function closeModal() { document.getElementById('product-modal').classList.add('hidden'); }
+
+async function saveProduct() {
+  const editId = document.getElementById('edit-id').value;
+  const payload = {
+    Product_ID:   parseInt(document.getElementById('f-pid').value),
+    Product_Name: document.getElementById('f-name').value.trim(),
+    Category_ID:  document.getElementById('f-cat').value || null,
+    Supplier_ID:  document.getElementById('f-supplier').value || null,
+    Price:        parseFloat(document.getElementById('f-price').value) || 0,
+    Unit:         document.getElementById('f-unit').value,
+    Status:       document.getElementById('f-status').value,
+  };
+  if (!payload.Product_Name) { showToast('Product name is required', 'error'); return; }
+
+  try {
+    const res = editId
+      ? await apiPut(`/api/products/${editId}`, payload)
+      : await apiPost('/api/products', payload);
+    if (res.success) {
+      showToast(editId ? 'Product updated!' : 'Product added!', 'success');
+      closeModal();
+      loadProducts();
+    } else {
+      showToast(res.error || 'Save failed', 'error');
+    }
+  } catch(e) { showToast('Network error', 'error'); }
+}
+
+async function deleteProduct(id) {
+  if (!confirm(`Delete product #${id}? This cannot be undone.`)) return;
+  try {
+    const res = await apiDelete(`/api/products/${id}`);
+    if (res.success) { showToast('Product deleted', 'success'); loadProducts(); }
+    else showToast(res.error || 'Delete failed', 'error');
+  } catch(e) { showToast('Network error', 'error'); }
+}
+
+loadProducts();
+loadDropdowns();
+</script>
+{% endblock %}
