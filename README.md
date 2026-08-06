@@ -1,255 +1,167 @@
-# Food Supply Management System
+# Food Supply Manager
 
-A complete professional web application for managing food supply operations.
+A full-stack **Food Supply Chain Management** application for managing suppliers, products,
+warehouses, inventory, distributors, customers, orders/payments and reporting — with an
+analytics dashboard and role-based access control.
 
-## Full-stack architecture (React + Express + MySQL)
+> ⚠️ **Note on the migration:** this repository was migrated from a Flask/Jinja + server-rendered
+> template stack to a **Node.js (Express) API + React (Vite/Tailwind) SPA**. The original
+> Flask runtime files have been removed from the tree; the MySQL schema, views, stored
+> procedures, triggers and default-admin bootstrap are preserved (see *Database* below).
+> Existing user password hashes are Werkzeug `scrypt`/`pbkdf2` hashes, which the new Node
+> backend verifies directly — **no password reset required**.
 
-The project has been migrated to a modern full-stack split while **reusing the
-existing MySQL schema** (`database/02_init.sql`) and its business rules (views,
-stored procedures) as the source of truth:
+## Tech stack
+
+| Layer | Technology |
+|-------|-----------|
+| Backend | Node.js, Express, TypeScript, `mysql2`, JWT (httpOnly cookies), bcryptjs |
+| Frontend | React 18, Vite, TypeScript, Tailwind CSS, React Router v6 |
+| Database | MySQL 8 (tables + views + stored procedures + audit triggers) |
+| Auth | bcrypt for new accounts; Werkzeug `scrypt`/`pbkdf2` verified for legacy users |
+| Roles | `admin` / `manager` / `viewer` (RBAC middleware) |
+
+## Project structure
 
 ```
-.
-├── backend/                  # Express + TypeScript + MySQL2 REST API
-├── frontend/                 # React + Vite + Tailwind CSS + React Router
+FoodSupplyManager/
+├── backend/                 # Node.js API (Express + TypeScript)
+│   ├── src/
+│   │   ├── config/          # Environment configuration
+│   │   ├── controllers/     # Per-domain route handlers (CRUD + reports)
+│   │   ├── db/              # mysql2 connection pool
+│   │   ├── middleware/      # auth (JWT + Werkzeug verification), roles, errors
+│   │   ├── routes/          # API route mounting (/api/*)
+│   │   ├── utils/           # Helpers (serialization, etc.)
+│   │   └── index.ts         # Express app entry point
+│   ├── Dockerfile           # Production Node image
+│   ├── package.json  •tsconfig.json
+│   └── .env.example
+├── frontend/                # React single-page application (Vite + Tailwind)
+│   ├── src/
+│   │   ├── api/             # Axios client (baseURL /api, credentials: include)
+│   │   ├── components/      # Layout, CrudPage, ui primitives
+│   │   ├── context/         # AuthContext (httpOnly-cookie session)
+│   │   ├── pages/           # Login, Dashboard, + one CRUD page per domain
+│   │   ├── App.tsx  •main.tsx  •index.css
+│   ├── Dockerfile           # Production nginx static build
+│   ├── vite.config.ts  •tailwind.config.js  •postcss.config.js
+│   └── package.json  •tsconfig.json
 ├── database/
-│   ├── 01_docker_create_user.sql
-│   └── 02_init.sql           # source-of-truth schema (unchanged)
-├── docker-compose.yml        # MySQL + API for local dev
-└── app.py                    # original Flask app (kept as reference)
+│   ├── 01_docker_create_user.sql   # MySQL user/role for containers
+│   └── 02_init.sql                 # Schema + views + procs + triggers + seed + admin
+├── setup_users.py                  # Bootstrap default admin user (Python tooling)
+├── create_views_and_procedures.py  # Ensure views/procedures/triggers exist
+├── run_db_init.py                  # Run database/02_init.sql against a local MySQL
+├── requirements-bootstrap.txt      # Python deps for the bootstrap scripts only
+├── docker-compose.yml
+└── .gitignore
 ```
 
-- **Backend**: Express + TypeScript, `mysql2` pool, JWT in httpOnly cookies,
-  bcrypt password hashing, role-based middleware (`admin` / `manager` / `viewer`),
-  centralized error handling. Default `admin` / `admin123`.
-- **Frontend**: React + Vite + Tailwind, protected routes, sidebar navigation,
-  generic CRUD screens, dashboard KPIs, and reports.
-- **Database**: unchanged. Runs `02_init.sql` on first boot via Docker Compose.
+## Prerequisites
 
-### Run the full stack
+- **Docker + Docker Compose** (recommended — brings up MySQL + API together), **or**
+- **MySQL 8** reachable locally **and**
+- **Node.js 20+** + **npm**
+- (Optional) **Python 3** + packages in `requirements-bootstrap.txt` — only needed for local
+  database bootstrapping. The application server itself is pure Node.
+
+## Quick start (Docker)
 
 ```bash
-# 1) Start MySQL (or point .env files at an existing instance)
-docker compose up -d db
+# 1. Backend config (copy the example, tweak if needed)
+cp backend/.env.example backend/.env
 
-# 2) Backend
-cd backend && cp .env.example .env && npm install && npm run dev     # :5001
+# 2. Start MySQL + the API
+docker compose up -d
 
-# 3) Frontend (separate terminal)
-cd frontend && npm install && npm run dev                            # :5173
+# 3. Start the frontend (dev server with Vite)
+cd frontend && npm install && npm run dev
+# → http://localhost:5173   (proxies /api to http://localhost:5001)
 ```
 
-Then open http://localhost:5173 and sign in with `admin` / `admin123`.
+Sign in with the seeded default account:
 
-See `backend/README.md` and `frontend/README.md` for detailed setup and the
-complete API reference.
+| Username | Password |
+|----------|----------|
+| `admin`  | `admin123` |
 
----
+> **Security:** change the admin password (or set `JWT_SECRET` / `MYSQL_PASSWORD` /
+> `CORS_ORIGIN`) before exposing the stack publicly.
 
-## Original Flask application
+## Local development (without Docker)
 
-The original Flask + MySQL build is preserved in `app.py` and can still be run as-is:
+```bash
+# Backend (port 5001)
+cp backend/.env.example backend/.env
+cd backend && npm install && npm run dev
 
-- **Backend**: Flask (Python)
-- **Database**: MySQL
-- **Frontend**: HTML5, Tailwind CSS, JavaScript (server-rendered templates)
-
-### Features
-
-- **User Authentication**: Secure login system with password hashing
-- **Dashboard**: Real-time metrics and statistics
-- **Supplier Management**: Complete CRUD operations for suppliers
-- **Product Management**: Track products, categories, pricing, and inventory
-- **Warehouse Management**: Manage warehouse facilities and capacity
-- **Distributor Management**: Handle distributor network and regions
-- **Customer Management**: Maintain customer database
-- **Order Management**: Process and track customer orders
-- **Search & Filter**: Quick search functionality across all entities
-- **Responsive Design**: Modern UI with Tailwind CSS
-
-## Technology Stack
-
-- **Backend**: Flask (Python)
-- **Database**: MySQL
-- **Frontend**: HTML5, Tailwind CSS, JavaScript
-- **Authentication**: Session-based with password hashing (Werkzeug)
-
-## Installation & Setup
-
-### Prerequisites
-
-- Python 3.10+
-- MySQL database server
-- Replit account (for hosting)
-
-### Environment Variables
-
-Set up the following environment variables in Replit Secrets:
-
+# Frontend (port 5173) — Vite proxies /api to the backend
+cd frontend && npm install && npm run dev
 ```
-MYSQL_HOST=your_mysql_host
-MYSQL_USER=your_mysql_username
-MYSQL_PASSWORD=your_mysql_password
-MYSQL_DATABASE=food_supply
-MYSQL_PORT=3306
-SECRET_KEY=your_secret_key_for_sessions
+## Environment variables
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `PORT` | `5001` | Backend listen port |
+| `MYSQL_HOST` | `localhost` | MySQL host (use `db` inside Docker Compose) |
+| `MYSQL_USER` / `MYSQL_PASSWORD` | `root` / `1234` | MySQL credentials |
+| `MYSQL_DATABASE` | `food_supply` | Database name |
+| `MYSQL_PORT` | `3306` | MySQL port |
+| `JWT_SECRET` | `dev-secret-change-me` | JWT signing key (**set in production**) |
+| `CORS_ORIGIN` | `http://localhost:5173` | Allowed frontend origin |
+| `ALLOW_REGISTRATION` | `true` | Permit self-registration (viewer role) |
+
+See `backend/.env.example` for the full list.
+
+## Database setup
+
+The single source of truth for the schema is `database/02_init.sql` (tables, lookup seed
+data, views, stored procedures, triggers, and the default `admin` account).
+
+- **Via Docker Compose** — MySQL auto-runs `02_init.sql` on first start, including the
+  `admin` / `admin123` seed account.
+- **Local MySQL (no Docker)** — bootstrap with the Python tooling:
+
+```bash
+pip install -r requirements-bootstrap.txt
+python run_db_init.py            # creates schema + views + procs + seed data
+python setup_users.py            # ensures the admin user exists
 ```
 
-### Initial Setup
+Key stored procedures used by the API:
 
-1. **Create the Users table and admin account**:
-   ```bash
-   python setup_users.py
-   ```
+| Procedure | Used by | Returns |
+|-----------|---------|---------|
+| `sp_DashboardStats` | `GET /api/dashboard/stats` | KPI counters + total revenue |
+| `sp_MonthlySalesReport` | `GET /api/reports/monthly-sales` | Revenue / units / orders per product |
+| `sp_PlaceOrder` | `POST /api/orders` | Places an order (checks stock, decrements inventory) |
 
-   This creates or repairs the Users table and resets the default admin account to:
-   - Username: `admin`
-   - Password: `admin123`
+Audit triggers (`trg_order_insert/update/delete`) record all order mutations in `AuditLog`.
 
-   **⚠️ IMPORTANT**: Change the admin password after first login!
+## API reference
 
-2. **Initialize the database schema and objects**:
-   ```bash
-   python run_db_init.py
-   python create_views_and_procedures.py
-   ```
+Full endpoint list: see [`backend/README.md`](backend/README.md).
+Frontend usage: see [`frontend/README.md`](frontend/README.md).
 
-3. **Start the application**:
-   ```bash
-   python app.py
-   ```
-   Then open http://127.0.0.1:5000.
+## Production build
 
-## Database Schema
+```bash
+# Backend
+cd backend && npm run build && npm start      # runs node dist/index.js
 
-The application works with the following tables:
+# Frontend (static assets, served by nginx)
+cd frontend && npm run build && docker build -t food-supply-frontend -f Dockerfile .
 
-- **Users**: Authentication and user management
-- **Supplier**: Supplier information
-- **Product**: Product catalog
-- **Warehouse**: Warehouse facilities
-- **Distributor**: Distribution network
-- **Customer**: Customer accounts
-- **OrderDetails**: Order tracking
-
-## Usage
-
-### Login
-
-1. Navigate to the application URL
-2. Login with the default credentials (or your created user)
-3. You'll be redirected to the dashboard
-
-### Managing Data
-
-- Use the sidebar navigation to access different sections
-- Click "Add" buttons to create new records
-- Use the search bar to filter data
-- Click edit/delete icons in tables to modify records
-
-### Dashboard
-
-The dashboard displays real-time statistics:
-- Total Suppliers
-- Total Products
-- Total Customers
-- Total Orders
-- Total Warehouses
-- Total Distributors
-
-## Security Features
-
-- ✅ Password hashing using Werkzeug
-- ✅ Session-based authentication
-- ✅ SQL injection protection (parameterized queries)
-- ✅ Environment variables for sensitive data
-- ✅ Login required decorators for protected routes
-
-## API Endpoints
-
-### Authentication
-- `POST /login` - User login
-- `GET /logout` - User logout
-
-### Dashboard
-- `GET /api/dashboard-stats` - Get dashboard statistics
-
-### Suppliers
-- `GET /api/suppliers` - Get all suppliers
-- `POST /api/suppliers` - Add new supplier
-- `PUT /api/suppliers/<id>` - Update supplier
-- `DELETE /api/suppliers/<id>` - Delete supplier
-
-### Products
-- `GET /api/products` - Get all products
-- `POST /api/products` - Add new product
-- `PUT /api/products/<id>` - Update product
-- `DELETE /api/products/<id>` - Delete product
-
-### Warehouses
-- `GET /api/warehouses` - Get all warehouses
-- `POST /api/warehouses` - Add new warehouse
-- `PUT /api/warehouses/<id>` - Update warehouse
-- `DELETE /api/warehouses/<id>` - Delete warehouse
-
-### Distributors
-- `GET /api/distributors` - Get all distributors
-- `POST /api/distributors` - Add new distributor
-- `PUT /api/distributors/<id>` - Update distributor
-- `DELETE /api/distributors/<id>` - Delete distributor
-
-### Customers
-- `GET /api/customers` - Get all customers
-- `POST /api/customers` - Add new customer
-- `PUT /api/customers/<id>` - Update customer
-- `DELETE /api/customers/<id>` - Delete customer
-
-### Orders
-- `GET /api/orders` - Get all orders
-- `POST /api/orders` - Add new order
-- `PUT /api/orders/<id>` - Update order
-- `DELETE /api/orders/<id>` - Delete order
-
-## File Structure
-
-```
-.
-├── app.py                      # Main Flask application
-├── setup_users.py              # Database setup script
-├── requirements.txt            # Python dependencies
-├── .env.example               # Environment variables template
-├── static/
-│   ├── css/
-│   │   └── custom.css         # Custom styles
-│   └── js/
-│       ├── main.js            # Toast notifications
-│       └── dashboard.js       # Dashboard logic
-└── templates/
-    ├── base.html              # Base template
-    ├── login.html             # Login page
-    ├── dashboard.html         # Dashboard page
-    ├── sidebar.html           # Sidebar component
-    ├── suppliers.html         # Suppliers management
-    ├── products.html          # Products management
-    ├── warehouses.html        # Warehouses management
-    ├── distributors.html      # Distributors management
-    ├── customers.html         # Customers management
-    └── orders.html            # Orders management
+# Or everything with Compose (MySQL + API):
+docker compose up -d
 ```
 
-## Development
+## Key files
 
-The application runs in debug mode during development. For production deployment:
-
-1. Set `FLASK_ENV=production` in environment variables
-2. Use a production WSGI server (Gunicorn recommended)
-3. Change the default admin password
-4. Use HTTPS for secure connections
-
-## Support
-
-For issues or questions, please check the database connection settings and ensure all environment variables are properly configured.
-
-## License
-
-This project is for educational and commercial use.
+- `backend/src/middleware/auth.ts` — JWT auth + Werkzeug hash verification
+  (`verifyPassword` accepts both bcrypt and legacy Werkzeug `pbkdf2`/`scrypt` hashes).
+- `backend/src/controllers/dashboard.controller.ts` — dashboard KPIs.
+- `frontend/src/pages/Dashboard.tsx` — dashboard UI.
+- `frontend/src/components/CrudPage.tsx` — generic CRUD table used by all module pages.
+- `frontend/src/context/AuthContext.tsx` — auth state backed by the httpOnly cookie.

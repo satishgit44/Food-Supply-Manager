@@ -1,0 +1,12 @@
+# Python bootstrap tooling ONLY - NOT used by the runtime application server.
+# The runtime is Node.js (see backend/package.json / frontend/package.json).
+#
+# These packages support the database bootstrap scripts used for local
+# (non-Docker) MySQL provisioning:
+#   - run_db_init.py                 -> executes database/02_init.sql
+#   - setup_users.py                 -> creates / seeds the default admin user
+#   - create_views_and_procedures.py -> ensures views, procedures & triggers exist
+
+mysql-connector-python>=8.2.0
+python-dotenv>=1.0.0
+werkzeug>=3.0.1

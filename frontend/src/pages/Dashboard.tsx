@@ -17,6 +17,7 @@ interface Stats {
 
 interface Order {
   Order_ID: number;
+  Customer_ID?: number;
   Customer_Name?: string;
   Total_Amount: number;
   Status: string;
@@ -176,9 +177,7 @@ export default function Dashboard() {
           )}
         </div>
       </div>
-      {/*__D3__*/}
-
-
     </div>
   );
 }
+

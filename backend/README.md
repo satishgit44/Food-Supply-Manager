@@ -1,101 +1,86 @@
-# Food Supply Manager — Backend API
+# Backend API
 
-Express + TypeScript REST API backed by the existing MySQL `food_supply` database
-(the schema in `database/02_init.sql` is the source of truth).
+Express + TypeScript API for the Food Supply Manager. Runs on **Node.js** with a `mysql2`
+connection pool, JWT auth in httpOnly cookies, and role-based access control.
 
-## Stack
+## Scripts
 
-- **Node.js + Express + TypeScript**
-- **MySQL2** (raw SQL) — reuses the existing schema, views, and stored procedures
-  (`sp_PlaceOrder`, `sp_DashboardStats`, `sp_MonthlySalesReport`) so all business
-  rules from the original Flask `app.py` are preserved.
-- **Auth**: JWT stored in an **httpOnly cookie** + `bcryptjs` password hashing.
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start with `ts-node-dev` (hot reload) in development. |
+| `npm run build` | Compile TypeScript → `dist/` (production). |
+| `npm start` | Run the compiled `dist/index.js`. |
+| `npm run typecheck` | `tsc --noEmit` (type-check without emitting). |
 
-## Setup
+## Quick start
 
 ```bash
-cd backend
+cp .env.example .env        # edit if needed
 npm install
-cp .env.example .env      # then edit credentials / JWT secret
-npm run dev               # ts-node-dev (hot reload) on :5001
-# or
-npm run build && npm start
+npm run dev                 # http://localhost:5001
 ```
 
-Ensure the `food_supply` database exists with the schema from `database/02_init.sql`
-and that an admin user is present (run the Python `setup_users.py` if needed, or the
-existing `02_init.sql` Users table). Default credentials: `admin` / `admin123`.
+In Docker:
 
-## Environment variables (see `.env.example`)
+```bash
+docker compose up -d
+```
 
-| Variable          | Default                | Description                     |
-| ----------------- | ---------------------- | ------------------------------- |
-| `PORT`            | `5001`                 | API port                        |
-| `MYSQL_HOST`      | `localhost`            | MySQL host                      |
-| `MYSQL_USER`      | `root`                 | MySQL user                      |
-| `MYSQL_PASSWORD`  | `1234`                 | MySQL password                  |
-| `MYSQL_DATABASE`  | `food_supply`          | Database name                   |
-| `MYSQL_PORT`      | `3306`                 | MySQL port                      |
-| `JWT_SECRET`      | `dev-secret-change-me` | JWT signing secret              |
-| `CORS_ORIGIN`     | `http://localhost:5173`| Allowed React origin (cookies)  |
-| `ALLOW_REGISTRATION` | `true`              | Enable self-registration        |
+## Configuration
 
-## API Endpoints
+Copy `.env.example` to `.env`. The API reads:
 
-All endpoints below (except auth) require the auth cookie. Write operations
-require `admin` or `manager`; user management requires `admin`.
+| Variable | Default | Notes |
+|----------|---------|-------|
+| `PORT` | `5001` | |
+| `MYSQL_HOST` | `localhost` | `db` when running under Docker Compose |
+| `MYSQL_USER` | `root` | |
+| `MYSQL_PASSWORD` | `1234` | |
+| `MYSQL_DATABASE` | `food_supply` | |
+| `MYSQL_PORT` | `3306` | |
+| `JWT_SECRET` | — | **Required in production** |
+| `JWT_EXPIRES_IN` | `12h` | |
+| `COOKIE_SECURE` | `false` | Set `true` behind HTTPS |
+| `COOKIE_SAMESITE` | `lax` | |
+| `CORS_ORIGIN` | `http://localhost:5173` | |
+| `ALLOW_REGISTRATION` | `true` | |
 
-### Auth
-| Method | Path            | Description                          |
-| ------ | --------------- | ------------------------------------ |
-| POST   | `/api/auth/login` | Login, sets httpOnly cookie          |
-| POST   | `/api/auth/register` | Create a viewer account (if enabled) |
-| POST   | `/api/auth/logout` | Clear cookie                        |
-| GET    | `/api/auth/me`   | Current user                         |
+## Authentication
 
-### Dashboard & Reports
-| Method | Path                            | Description                |
-| ------ | ------------------------------- | -------------------------- |
-| GET    | `/api/dashboard/stats`          | KPI dashboard stats        |
-| GET    | `/api/reports/inventory-status` | Inventory report           |
-| GET    | `/api/reports/payment-summary`  | Payment summary report     |
-| GET    | `/api/reports/supplier-performance` | Supplier report        |
-| GET    | `/api/reports/revenue-by-category` | Revenue by category     |
-| GET    | `/api/reports/top-customers`    | Top customers              |
-| GET    | `/api/reports/monthly-sales?year=&month=` | Monthly sales report |
+- `POST /api/auth/login` — verifies credentials and sets an httpOnly `token` cookie.
+- `POST /api/auth/register` — self-registration (when `ALLOW_REGISTRATION=true`); new
+  accounts use **bcrypt** and are assigned the `viewer` role.
+- `POST /api/auth/logout` / `GET /api/auth/me` — session helpers.
 
-### CRUD modules
-Standard `GET /`, `POST /`, `PUT /:id`, `DELETE /:id` for:
-`/api/categories`, `/api/suppliers`, `/api/products`, `/api/warehouses`,
-`/api/inventory` (plus `/low-stock`), `/api/distributors`, `/api/customers`,
-`/api/orders`, `/api/payments`.
+**Backward compatibility:** password hashes are checked with `verifyPassword`
+(`src/middleware/auth.ts`), which accepts:
+- bcrypt hashes (new accounts), and
+- legacy Werkzeug `pbkdf2:...` / `scrypt:...` hashes created by the original Flask app
+  (`setup_users.py`). Existing users therefore keep working without a password reset.
 
-### Users (admin)
-| Method | Path                  | Description              |
-| ------ | --------------------- | ------------------------ |
-| GET    | `/api/users`          | List users               |
-| PUT    | `/api/users/:id`      | Update role / active     |
-| DELETE | `/api/users/:id`      | Delete user              |
-| PUT    | `/api/users/me/password` | Change own password    |
+## Routes
 
-> Note: orders created with a `Warehouse_ID` use the `sp_PlaceOrder` stored
-> procedure, which validates available stock and decrements inventory. Sending
-> `use_inventory_check: false` bypasses the check (direct insert), matching the
-> original application behaviour.
+| Method | Route | Auth | Role | Description |
+|--------|-------|------|------|-------------|
+| POST | `/api/auth/login` | — | — | Login (sets httpOnly cookie) |
+| POST | `/api/auth/register` | — | — | Register a new viewer |
+| POST | `/api/auth/logout` | — | — | Clear cookie |
+| GET | `/api/auth/me` | JWT | any | Current user |
+| GET | `/api/dashboard/stats` | JWT | any | `sp_DashboardStats` KPIs |
+| GET | `/api/reports/monthly-sales` | JWT | any | `sp_MonthlySalesReport` |
+| POST | `/api/orders` | JWT | admin/manager | `sp_PlaceOrder` |
+| CRUD | `/api/categories|suppliers|products|warehouses|inventory|distributors|customers|payments|users` | JWT | write → admin/manager | Standard CRUD |
+| GET | `/api/health` | — | — | Liveness probe |
 
 ## Project layout
 
 ```
-backend/
-├─ src/
-│  ├─ index.ts                 # Express app + route mounting
-│  ├─ config/index.ts          # environment config
-│  ├─ db/index.ts              # MySQL2 pool + query helpers
-│  ├─ middleware/
-│  │  ├─ auth.ts               # JWT cookie auth + role guards
-│  │  └─ error.ts              # centralized error handler
-│  ├─ controllers/             # request handlers per module
-│  └─ routes/                  # Express routers per module
-├─ Dockerfile
-└─ .env.example
+src/
+├── config/index.ts
+├── db/index.ts
+├── index.ts
+├── middleware/   auth.ts | roles.ts | error.ts
+├── controllers/  auth | dashboard | orders | reports | users | … (one per domain)
+├── routes/       auth | dashboard | orders | reports | users | …
+└── utils/        serialize.ts
 ```

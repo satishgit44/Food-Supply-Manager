@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import { config, WRITE_ROLES, ADMIN_ROLES } from "../config";
 
 export interface AuthUser {
@@ -47,7 +48,82 @@ export function hashPassword(plain: string): string {
   return bcrypt.hashSync(plain, 10);
 }
 
+function timingSafeEqual(a: Buffer, b: Buffer): boolean {
+  if (a.length !== b.length) return false;
+  return crypto.timingSafeEqual(a, b);
+}
+
+/** Constant-time compare of a derived buffer against a hex digest string. */
+function hexDigestEqual(derived: Buffer, expectedHex: string): boolean {
+  const expected = Buffer.from(expectedHex, "hex");
+  if (expected.length !== derived.length) return false;
+  return timingSafeEqual(derived, expected);
+}
+
+/**
+ * Verify a Werkzeug `pbkdf2:...` hash produced by the original Flask app.
+ * Format: `pbkdf2:<hash>:<iterations>$<salt_string>$<digest_hex>`
+ * The salt is the raw ASCII salt text (utf8) and the digest is hex.
+ */
+function verifyWerkzeugPkdf2(plain: string, stored: string): boolean {
+  try {
+    const parts = stored.split("$");
+    if (parts.length !== 3) return false;
+    const params = parts[0].split(":");
+    if (params[0] !== "pbkdf2") return false;
+    const method = params[1] ?? "sha256";
+    const iterations = parseInt(params[2] ?? "1", 10);
+    const salt = Buffer.from(parts[1], "utf8");
+    const expectedHex = parts[2].toLowerCase();
+    const keyLen = Buffer.from(expectedHex, "hex").length;
+    const derived = crypto.pbkdf2Sync(plain, salt, iterations, keyLen, method);
+    return hexDigestEqual(derived, expectedHex);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Verify a Werkzeug `scrypt:...` hash produced by the original Flask app.
+ * Format: `scrypt:<n>:<r>:<p>$<salt_string>$<digest_hex>`
+ * Werkzeug derives a 64-byte key with `hashlib.scrypt(password, salt=salt_text_bytes,
+ * n, r, p)` and stores the hex digest; the salt is the raw ASCII salt text (utf8).
+ */
+function verifyWerkzeugScrypt(plain: string, stored: string): boolean {
+  try {
+    const parts = stored.split("$");
+    if (parts.length !== 3) return false;
+    const params = parts[0].split(":");
+    if (params[0] !== "scrypt") return false;
+    const n = parseInt(params[1] ?? "32768", 10);
+    const r = parseInt(params[2] ?? "8", 10);
+    const p = parseInt(params[3] ?? "1", 10);
+    const salt = Buffer.from(parts[1], "utf8");
+    const expectedHex = parts[2].toLowerCase();
+    // Node defaults to a 32MB maxmem cap which is too low for n=32768,r=8.
+    // Replicate Werkzeug's memory allowance (132 * n * r * p).
+    const derived = crypto.scryptSync(plain, salt, 64, {
+      N: n,
+      r,
+      p,
+      maxmem: 132 * n * r * p,
+    });
+    return hexDigestEqual(derived, expectedHex);
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Verify a password against:
+ *  - a bcrypt hash (new accounts created by this API), or
+ *  - a Werkzeug pbkdf2 / scrypt hash (accounts created by the original Flask
+ *    app via setup_users.py), so existing users keep working without rehashing.
+ */
 export function verifyPassword(plain: string, hash: string): boolean {
+  if (!hash) return false;
+  if (hash.startsWith("pbkdf2:")) return verifyWerkzeugPkdf2(plain, hash);
+  if (hash.startsWith("scrypt:")) return verifyWerkzeugScrypt(plain, hash);
   try {
     return bcrypt.compareSync(plain, hash);
   } catch {

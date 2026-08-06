@@ -54,7 +54,10 @@ export async function getDashboardStats(_req: Request, res: Response): Promise<v
     });
     return;
   }
-  const row = proc.rows[0];
+  const rows0 = proc.rows[0];
+  // mysql2 wraps CALL result sets in an extra array, so `rows[0]` may be
+  // the row array itself; unwrap one level when present.
+  const row = (Array.isArray(rows0) ? rows0[0] : rows0) as StatsRow | undefined;
   res.json(
     row
       ? serialize(row)

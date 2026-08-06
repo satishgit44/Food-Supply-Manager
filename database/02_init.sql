@@ -580,5 +580,11 @@ DELIMITER ;
 
 -- Reference queries (Q1–Q50) are in queries_reference.sql for documentation.
 -- ================================================================
+-- Default admin account (username: admin, password: admin123).
+-- werkzeug scrypt hash - verified by backend/src/middleware/auth.ts
+-- Uses INSERT IGNORE so it is idempotent on re-runs.
+INSERT IGNORE INTO Users (username, password_hash, full_name, email, role, is_active)
+VALUES ('admin', 'scrypt:32768:8:1$XSDP0vP4XtBSmXYW$e7dd96325a4d699036136c6dfe2407d69baab013f2a07b91cb08b9cd7995f08cae8a1d576a2a3551cdca2e1817a29567600f088bfb4faa3c7a22fcbde33f7676', 'Administrator', 'admin@foodsupply.com', 'admin', 1);
+
 -- SETUP COMPLETE
 -- ================================================================

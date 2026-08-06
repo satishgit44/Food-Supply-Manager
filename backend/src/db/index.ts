@@ -1,5 +1,6 @@
-import mysql, { Pool, PoolConnection, RowDataPacket } from "mysql2/promise";
+import mysql, { Pool, PoolConnection, ResultSetHeader } from "mysql2/promise";
 import { config } from "../config";
+
 
 export const pool: Pool = mysql.createPool({
   host: config.mysql.host,
@@ -21,18 +22,18 @@ export type QueryResult<T> = Promise<{ rows: T[]; err: string | null }>;
  * - fetchOne: return a single row (or null)
  * - fetchAll: return all rows
  */
-export async function dbQuery<T extends RowDataPacket = RowDataPacket>(
+export async function dbQuery<T = Record<string, unknown>>(
   sql: string,
   params: unknown[] = [],
   mode: "all" | "one" = "all",
 ): Promise<{ rows: T[] | T | null; err: string | null }> {
   try {
-    const [result] = await pool.query<T[]>(sql, params);
+    const [result] = await pool.query(sql, params);
+    const arr = result as unknown as T[];
     if (mode === "one") {
-      const arr = result as unknown as T[];
       return { rows: arr[0] ?? null, err: null };
     }
-    return { rows: result as unknown as T[], err: null };
+    return { rows: arr, err: null };
   } catch (e) {
     return { rows: null, err: (e as Error).message };
   }
@@ -42,10 +43,14 @@ export async function dbQuery<T extends RowDataPacket = RowDataPacket>(
 export async function dbExecute(
   sql: string,
   params: unknown[] = [],
-): Promise<{ err: string | null; insertId?: number }> {
+): Promise<{ err: string | null; insertId?: number; affectedRows?: number }> {
   try {
     const [result] = await pool.query(sql, params);
-    return { err: null, insertId: (result as mysql.ResultSetHeader).insertId };
+    return {
+      err: null,
+      insertId: (result as ResultSetHeader).insertId,
+      affectedRows: (result as ResultSetHeader).affectedRows,
+    };
   } catch (e) {
     return { err: (e as Error).message };
   }
@@ -59,14 +64,14 @@ export async function getConnection(): Promise<PoolConnection> {
 /**
  * Call a stored procedure and return the first result set as rows.
  */
-export async function callProcedure<T extends RowDataPacket = RowDataPacket>(
+export async function callProcedure<T = Record<string, unknown>>(
   procedure: string,
   args: unknown[] = [],
 ): Promise<{ rows: T[]; err: string | null }> {
   let conn: PoolConnection | null = null;
   try {
     conn = await pool.getConnection();
-    const [rows] = await conn.query<T[]>(`CALL ${procedure}(${args.map(() => "?").join(",")})`, args);
+    const [rows] = await conn.query(`CALL ${procedure}(${args.map(() => "?").join(",")})`, args);
     return { rows: rows as unknown as T[], err: null };
   } catch (e) {
     return { rows: [], err: (e as Error).message };

@@ -1,48 +1,66 @@
-# Food Supply Manager — Frontend
+# Frontend
 
-React + Vite + Tailwind CSS + React Router single-page app for the Food Supply
-Management System. It talks to the Express API in `../backend` (cookie-based auth).
+React single-page application for the Food Supply Manager, built with **Vite**, **TypeScript**,
+**Tailwind CSS** and **React Router v6**.
 
-## Setup
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start the Vite dev server (port 5173) with an `/api` proxy to the backend. |
+| `npm run build` | Type-check + production build → `dist/`. |
+| `npm run preview` | Serve the production build locally. |
+| `npm run typecheck` | `tsc --noEmit`. |
+
+## Quick start
 
 ```bash
-cd frontend
 npm install
-npm run dev        # starts Vite on :5173, proxies /api -> http://localhost:5001
+npm run dev
+# open http://localhost:5173
+# default login: admin / admin123
 ```
 
-Make sure the backend is running on `:5001` (see `../backend/README.md`), the
-MySQL `food_supply` database is initialized, and an admin user exists
-(`admin` / `admin123`).
+The dev server proxies `/api` requests to `http://localhost:5173` → backend `:5001`
+(see `vite.config.ts`), so there is **no CORS** during development.
 
-## Production build
+## How auth works
+
+Authentication is cookie-based (httpOnly JWT). The Axios client
+(`src/api/client.ts`) sends `credentials: include` on every request, so once you log in
+the session cookie is forwarded automatically to protected API endpoints.
+
+- `src/context/AuthContext.tsx` — exposes `user`, `loading`, `login()`, `logout()`.
+- `src/components/Layout.tsx` — sidebar + navigation (role-aware).
+- `src/pages/Login.tsx` — login screen; defaults shown for convenience.
+
+## Routing
+
+| Path | Page |
+|------|------|
+| `/login` | Login |
+| `/` | Dashboard (KPIs + low-stock alerts) |
+| `/suppliers`, `/products`, `/warehouses`, `/inventory`, `/distributors`, `/customers`, `/orders`, `/payments`, `/categories`, `/users` | CRUD pages (generic `CrudPage`) |
+| `/reports` | Monthly sales report |
+
+## Project layout
+
+```
+src/
+├── api/client.ts            # axios instance (baseURL /api, credentials: include)
+├── components/              # Layout, CrudPage, ui primitives
+├── context/AuthContext.tsx  # auth state
+├── pages/                   # one page per route
+├── App.tsx                  # router + protected-route guards
+├── main.tsx
+└── index.css
+```
+
+## Building for production
 
 ```bash
-npm run build      # outputs to dist/
-npm run preview
+npm run build
+# dist/ can be served by any static server (e.g. nginx via ./Dockerfile)
 ```
 
-## Structure
-
-```
-frontend/
-├─ index.html
-├─ vite.config.ts         # /api proxy to backend
-├─ tailwind.config.js
-└─ src/
-   ├─ main.tsx            # entry + AuthProvider + router
-   ├─ App.tsx             # routes with protected layout
-   ├─ api/client.ts       # fetch wrapper (credentials = httpOnly cookie)
-   ├─ context/AuthContext.tsx
-   ├─ components/
-   │  ├─ Layout.tsx       # sidebar + topbar navigation
-   │  ├─ CrudPage.tsx     # generic CRUD (table + add/edit modal)
-   │  └─ ui.tsx           # Badge, Modal, Spinner, StatusBadge
-   └─ pages/              # Login, Dashboard, Suppliers, Products, Categories,
-                          # Inventory, Warehouses, Distributors, Customers,
-                          # Orders, Payments, Reports, Users (admin)
-```
-
-Most CRUD screens share the generic `CrudPage` component, configured with the
-columns to display and a form-field schema (including dropdown options loaded
-from the API).
+`tailwind.config.js` uses the default `content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"]`.

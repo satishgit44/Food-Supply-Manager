@@ -76,7 +76,12 @@ export async function reportMonthlySales(req: Request, res: Response): Promise<v
   try {
     conn = await getConnection();
     const [rows] = await conn.query("CALL sp_MonthlySalesReport(?, ?)", [year, month]);
-    const result = Array.isArray(rows) ? (rows[0] as unknown[]) : [];
+    // `rows` is the procedure's result set; some mysql2/promise versions wrap
+    // CALL results in an extra array, so unwrap one level if present.
+    const anyRows = rows as unknown;
+    const result = Array.isArray(anyRows) && Array.isArray((anyRows as unknown[])[0])
+      ? (anyRows as unknown[][])[0]
+      : anyRows;
     res.json(serialize(result));
   } catch (e) {
     res.status(500).json({ error: (e as Error).message });
